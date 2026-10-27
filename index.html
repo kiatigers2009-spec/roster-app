@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> 로스터 관리 & 시즌 현황판 </title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Firebase SDK (Modular v13) 추가 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCYms9BtVzC5HAnlE5-aHCADIcz75x2uTk",
+            authDomain: "roster-management-34257.firebaseapp.com",
+            projectId: "roster-management-34257",
+            storageBucket: "roster-management-34257.firebasestorage.app",
+            messagingSenderId: "661118063311",
+            appId: "1:661118063311:web:813cfb51acace930e55dba",
+            measurementId: "G-1T0TD0SLFL"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.dbDocRef = doc(db, "managerData", "mainData");
+        window.firestoreModule = { getDoc, setDoc };
+
+        window.loadDataFromCloud();
+    </script>
+
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .sticky-col { position: sticky; left: 0; z-index: 10; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col md:flex-row">
+
+    <!-- [모바일 전용] 상단 헤더바 -->
+    <header class="md:hidden bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-30 border-b border-slate-800 shadow-md">
+        <div class="flex items-center space-x-2.5">
+            <div class="bg-brand-600 text-white p-2 rounded-xl shadow-md">
+                <i data-lucide="trophy" class="w-4 h-4"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm leading-tight">로스터 관리</h1>
+                <p class="text-[10px] text-slate-400">By 김상현</p>
+            </div>
+        </div>
+        <button onclick="toggleMobileMenu()" class="p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-semibold flex items-center space-x-1.5 active:scale-95 transition">
+            <i data-lucide="menu" class="w-4 h-4"></i>
+            <span>메뉴</span>
+        </button>
+    </header>
+
+    <!-- [모바일 전용] 슬라이드 메뉴 드로어 -->
+    <div id="mobileMenuDrawer" class="md:hidden fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 hidden flex flex-col p-6 space-y-6 overflow-y-auto text-slate-300">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+            <div class="flex items-center space-x-2">
+                <div class="bg-brand-600 text-white p-1.5 rounded-lg"><i data-lucide="trophy" class="w-4 h-4"></i></div>
+                <span class="font-bold text-base text-white">메뉴 및 시즌 목록</span>
+            </div>
+            <button onclick="toggleMobileMenu()" class="p-2 text-slate-400 text-2xl font-bold hover:text-white">×</button>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">팀 관리 홈</div>
+                <button onclick="switchMainView('op'); toggleMobileMenu();" class="w-full flex items-center space-x-2.5 py-3 px-4 rounded-xl font-semibold text-xs transition bg-brand-600 text-white shadow-sm">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    <span>로스터 및 운영 관리</span>
+                </button>
+            </div>
+            <div>
+                <div class="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                    <span>시즌 현황</span>
+                    <button onclick="promptAddSeason(); toggleMobileMenu();" class="text-brand-400 hover:text-brand-300 flex items-center space-x-0.5 text-[11px] font-semibold">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                        <span>새 시즌</span>
+                    </button>
+                </div>
+                <div id="mobileSidebarSeasonList" class="space-y-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- [PC 전용] 좌측 사이드바 네비게이션 -->
+    <aside class="w-64 bg-slate-900 text-slate-300 flex-col border-r border-slate-800 shrink-0 h-screen sticky top-0 overflow-y-auto hidden md:flex">
+        <div class="p-5 border-b border-slate-800 flex items-center space-x-3">
+            <div class="bg-brand-600 text-white p-2 rounded-xl shadow-md">
+                <i data-lucide="trophy" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-sm text-white leading-tight">로스터 관리</h1>
+                <p class="text-[11px] text-slate-400">Made by 김상현</p>
+            </div>
+        </div>
+
+        <div class="p-4 space-y-6 flex-1">
+            <div>
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 px-2">팀 관리</div>
+                <button onclick="switchMainView('op')" id="sidebar-btn-op" class="w-full flex items-center space-x-2.5 py-2.5 px-3 rounded-xl font-semibold text-xs transition bg-brand-600 text-white shadow-sm">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    <span>로스터 관리</span>
+                </button>
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 px-2">
+                    <span>시즌 현황</span>
+                    <button onclick="promptAddSeason()" class="text-brand-400 hover:text-brand-300 flex items-center space-x-0.5 text-[11px] font-semibold">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                        <span>새 시즌</span>
+                    </button>
+                </div>
+                <div id="sidebarSeasonList" class="space-y-3"></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 w-full md:max-w-[calc(100vw-16rem)] min-h-screen overflow-y-auto p-4 sm:p-6 md:p-8">
+
+        <!-- ==================== 1. 운영 관리 VIEW ==================== -->
+        <section id="view-op" class="space-y-6 max-w-7xl mx-auto">
+            <div class="flex overflow-x-auto custom-scrollbar gap-2 p-1.5 bg-slate-200/60 dark:bg-slate-800 rounded-2xl border border-slate-200/80 whitespace-nowrap">
+                <button onclick="switchOpSubTab('global')" id="subnav-global" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition shadow-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white">전체 로스터 관리</button>
+                <button onclick="switchOpSubTab('roster')" id="subnav-roster" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition text-slate-600 dark:text-slate-400 hover:text-slate-900">로스터 관리</button>
+                <button onclick="switchOpSubTab('draft')" id="subnav-draft" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition text-slate-600 dark:text-slate-400 hover:text-slate-900">드래프트</button>
+                <button onclick="switchOpSubTab('team1')" id="subnav-team1" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition text-slate-600 dark:text-slate-400 hover:text-slate-900">1팀 로스터</button>
+                <button onclick="switchOpSubTab('team2')" id="subnav-team2" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition text-slate-600 dark:text-slate-400 hover:text-slate-900">2팀 로스터</button>
+            </div>
+
+            <!-- Sub Tab 1: 전체 로스터 관리 -->
+            <div id="op-subtab-global" class="op-sub-card space-y-6">
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border shadow-sm space-y-4">
+                    <h3 class="text-base font-bold flex items-center space-x-2">
+                        <i data-lucide="user-plus" class="w-5 h-5 text-brand-600"></i>
+                        <span>신규 선수 등록</span>
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">선수 이름</label>
+                            <input type="text" id="inputName" placeholder="선수명 입력" class="w-full bg-slate-50 dark:bg-slate-900 border rounded-xl px-3 py-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">포지션</label>
+                            <select id="inputPos" class="w-full bg-slate-50 dark:bg-slate-900 border rounded-xl px-3 py-2.5 text-sm">
+                                <option value="선발투수">선발투수</option>
+                                <option value="릴리프">릴리프</option>
+                                <option value="불펜">불펜</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">투타 (손)</label>
+                            <select id="inputHand" class="w-full bg-slate-50 dark:bg-slate-900 border rounded-xl px-3 py-2.5 text-sm">
+                                <option value="우">우투우타 (우)</option>
+                                <option value="좌">좌투좌타 (좌)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">등번호</label>
+                            <input type="number" id="inputBackNum" placeholder="등번호" class="w-full bg-slate-50 dark:bg-slate-900 border rounded-xl px-3 py-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">선수 유형</label>
+                            <select id="inputType" class="w-full bg-slate-50 dark:bg-slate-900 border rounded-xl px-3 py-2.5 text-sm">
+                                <option value="현역">현역</option>
+                                <option value="밀전드">밀전드</option>
+                                <option value="공통 선수">공통 선수</option>
+                                <option value="절대 선수">절대 선수</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="registerGlobalPlayer()" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 px-4 rounded-xl transition text-sm shadow-sm">등록하기</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h3 class="font-bold text-sm sm:text-base">전체 등록 선수 명단</h3>
+                        <span id="globalPlayerCount" class="text-xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg">총 0명</span>
+                    </div>
+                    <!-- 모바일 가독성을 위해 가로 스크롤(overflow-x-auto) 및 테이블 최소 너비 부여 -->
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full min-w-[550px] text-sm text-left">
+                            <tbody id="globalPlayerTableBody" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sub Tab 2: 로스터 관리 -->
+            <div id="op-subtab-roster" class="op-sub-card hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden flex flex-col"><div class="p-4 bg-slate-50 dark:bg-slate-900 border-b font-bold flex justify-between"><span>선발투수</span><span id="rosterStarterCount" class="text-xs bg-brand-100 text-brand-700 px-2 rounded-full">0명</span></div><table class="w-full text-xs"><tbody id="rosterStarterBody" class="divide-y"></tbody></table></div>
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden flex flex-col"><div class="p-4 bg-slate-50 dark:bg-slate-900 border-b font-bold flex justify-between"><span>릴리프</span><span id="rosterReliefCount" class="text-xs bg-brand-100 text-brand-700 px-2 rounded-full">0명</span></div><table class="w-full text-xs"><tbody id="rosterReliefBody" class="divide-y"></tbody></table></div>
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden flex flex-col"><div class="p-4 bg-slate-50 dark:bg-slate-900 border-b font-bold flex justify-between"><span>불펜</span><span id="rosterBullpenCount" class="text-xs bg-brand-100 text-brand-700 px-2 rounded-full">0명</span></div><table class="w-full text-xs"><tbody id="rosterBullpenBody" class="divide-y"></tbody></table></div>
+                </div>
+                
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden">
+                    <div class="p-4 bg-slate-100 dark:bg-slate-900 border-b font-bold text-slate-500 flex justify-between"><span>방출 선수 명단</span><span id="rosterReleaseCount" class="text-xs bg-slate-200 dark:bg-slate-800 px-2 rounded-full">0명</span></div>
+                    <table class="w-full text-xs"><tbody id="rosterReleaseBody" class="divide-y"></tbody></table>
+                </div>
+
+                <!-- 등번호 종합 매트릭스 -->
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden space-y-3 p-4 sm:p-5">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-3 gap-2">
+                        <h3 class="font-bold text-sm sm:text-base flex items-center space-x-2">
+                            <i data-lucide="grid" class="w-5 h-5 text-brand-600"></i>
+                            <span>등번호 종합 매트릭스 (0 ~ 99번)</span>
+                        </h3>
+                        <div class="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+                            <span class="flex items-center space-x-1"><span class="w-3 h-3 bg-blue-100 border border-blue-300 rounded inline-block"></span><span>현역</span></span>
+                            <span class="flex items-center space-x-1"><span class="w-3 h-3 bg-amber-100 border border-amber-300 rounded inline-block"></span><span>밀전드</span></span>
+                            <span class="flex items-center space-x-1"><span class="w-3 h-3 bg-emerald-100 border border-emerald-300 rounded inline-block"></span><span>공통</span></span>
+                            <span class="flex items-center space-x-1"><span class="w-3 h-3 bg-rose-100 border border-rose-300 rounded inline-block"></span><span>절대</span></span>
+                            <span class="flex items-center space-x-1"><span class="w-3 h-3 bg-slate-300 border border-slate-400 rounded inline-block"></span><span>방출</span></span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-xs text-center border-collapse border border-slate-300 dark:border-slate-700">
+                            <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 font-bold">
+                                <tr id="backNumMatrixHead"></tr>
+                            </thead>
+                            <tbody id="backNumMatrixBody" class="divide-y divide-slate-300 dark:divide-slate-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sub Tab 3: 드래프트 -->
+            <div id="op-subtab-draft" class="op-sub-card hidden space-y-6">
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="inline-flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border w-full md:w-auto">
+                        <button onclick="switchDraftPos('starter')" id="draft-pos-starter" class="draft-pos-btn flex-1 md:flex-none py-2 px-4 text-xs font-semibold rounded-lg bg-white shadow-sm">선발</button>
+                        <button onclick="switchDraftPos('relief')" id="draft-pos-relief" class="draft-pos-btn flex-1 md:flex-none py-2 px-4 text-xs font-semibold rounded-lg text-slate-600">릴리프</button>
+                        <button onclick="switchDraftPos('bullpen')" id="draft-pos-bullpen" class="draft-pos-btn flex-1 md:flex-none py-2 px-4 text-xs font-semibold rounded-lg text-slate-600">불펜</button>
+                    </div>
+                    <div class="space-x-2 flex flex-wrap gap-2 w-full md:w-auto justify-end">
+                        <button onclick="executeRandomDraft()" class="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2.5 px-3.5 rounded-xl shadow-sm">무작위 드래프트</button>
+                        <button onclick="executeRosterInspection()" class="flex-1 md:flex-none bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold py-2.5 px-3.5 rounded-xl shadow-sm">로스터 점검</button>
+                        <button onclick="saveFinalRosters()" class="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2.5 px-3.5 rounded-xl shadow-sm">최종 저장</button>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden">
+                    <div class="p-4 border-b font-bold flex justify-between items-center"><span id="draftEligibleTitle">대기 선수 목록</span><span id="draftEligibleCount" class="text-xs bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-lg">0명</span></div>
+                    <div class="overflow-x-auto max-h-48 custom-scrollbar"><table class="w-full text-xs text-left"><tbody id="draftEligibleBody" class="divide-y"></tbody></table></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden"><div class="p-4 bg-brand-50/50 dark:bg-brand-950/30 border-b font-bold text-brand-700 dark:text-brand-400 flex justify-between"><span>🔵 1팀 지명 현황</span><span id="team1DraftCount" class="text-xs bg-brand-100 dark:bg-brand-900 text-brand-700 dark:text-brand-300 px-2 rounded-full">0명</span></div><table class="w-full text-xs"><tbody id="team1DraftBody" class="divide-y"></tbody></table></div>
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden"><div class="p-4 bg-amber-50/50 dark:bg-amber-950/30 border-b font-bold text-amber-700 dark:text-amber-400 flex justify-between"><span>🟠 2팀 지명 현황</span><span id="team2DraftCount" class="text-xs bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-2 rounded-full">0명</span></div><table class="w-full text-xs"><tbody id="team2DraftBody" class="divide-y"></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- Sub Tab 4: 1팀 로스터 -->
+            <div id="op-subtab-team1" class="op-sub-card hidden bg-white dark:bg-slate-800 rounded-2xl border p-4 sm:p-5 shadow-sm">
+                <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-brand-700 dark:text-brand-400 text-base">🔵 1팀 로스터</h3><span id="team1FinalTotalCount" class="text-xs font-bold px-2.5 py-1 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-300 rounded-lg">총 0명</span></div>
+                <div class="overflow-x-auto"><table class="w-full text-sm"><tbody id="team1FinalTableBody" class="divide-y"></tbody></table></div>
+            </div>
+
+            <!-- Sub Tab 5: 2팀 로스터 -->
+            <div id="op-subtab-team2" class="op-sub-card hidden bg-white dark:bg-slate-800 rounded-2xl border p-4 sm:p-5 shadow-sm">
+                <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-amber-600 dark:text-amber-400 text-base">🟠 2팀 로스터</h3><span id="team2FinalTotalCount" class="text-xs font-bold px-2.5 py-1 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 rounded-lg">총 0명</span></div>
+                <div class="overflow-x-auto"><table class="w-full text-sm"><tbody id="team2FinalTableBody" class="divide-y"></tbody></table></div>
+            </div>
+        </section>
+
+        <!-- ==================== 2. 시즌별 4개 탭 컨테이너 ==================== -->
+        <div id="seasonMatrixViewsContainer"></div>
+
+    </main>
+
+    <!-- 정규시즌 셀 모달 -->
+    <div id="statusModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-xl border">
+            <div class="flex justify-between items-center border-b pb-3"><h3 id="modalTitle" class="font-bold text-sm">선수 상태 및 코멘트</h3><button onclick="closeModal()" class="text-slate-400 text-lg font-bold">×</button></div>
+            <div class="space-y-3">
+                <select id="modalStatusSelect" onchange="toggleModalInjuryOption()" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-900">
+                    <option value="공백">공백 (비우기)</option>
+                    <option value="메이저">메이저</option>
+                    <option value="마이너">마이너 (최소 10G)</option>
+                    <option value="부상">부상 등록 (IL)</option>
+                </select>
+                <div id="modalInjuryBox" class="hidden">
+                    <select id="modalInjuryType" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-900">
+                        <option value="부상 15일">15일 부상자 명단 (IL-15)</option>
+                        <option value="부상 30일">30일 부상자 명단 (IL-30)</option>
+                        <option value="부상 60일">60일 부상자 명단 (IL-60)</option>
+                        <option value="시즌아웃">시즌 아웃 (OUT)</option>
+                        <option value="토미존">토미존 수술 (TJS)</option>
+                    </select>
+                </div>
+                <input type="text" id="modalComment" placeholder="코멘트 입력" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-900">
+            </div>
+            <div class="flex justify-end space-x-2 pt-2"><button onclick="closeModal()" class="px-4 py-2 text-xs bg-slate-100 dark:bg-slate-700 rounded-xl font-semibold">취소</button><button onclick="saveModalStatus()" class="px-4 py-2 text-xs bg-brand-600 text-white rounded-xl font-semibold shadow-sm">저장</button></div>
+        </div>
+    </div>
+
+    <!-- 포스트시즌 선수별 승/패/홀드/세이브/등판/블론 간편 선택 모달 -->
+    <div id="psPlayerStatModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-xl border">
+            <div class="flex justify-between items-center border-b pb-3"><h3 id="psPlayerModalTitle" class="font-bold text-sm">포스트시즌 선수 기록 선택</h3><button onclick="closePsPlayerModal()" class="text-slate-400 text-lg font-bold">×</button></div>
+            <div class="space-y-3">
+                <label class="block text-xs font-semibold text-slate-500 mb-1">투수 성적 선택</label>
+                <select id="modalPlayerStatSelect" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-900 font-semibold">
+                    <option value="">(기록 없음)</option>
+                    <option value="승">승리 (WIN)</option>
+                    <option value="패">패배 (LOSS)</option>
+                    <option value="홀드">홀드 (HOLD)</option>
+                    <option value="세이브">세이브 (SAVE)</option>
+                    <option value="등판">등판 (ND)</option>
+                    <option value="블론">블론세이브 (BS)</option>
+                </select>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2"><button onclick="closePsPlayerModal()" class="px-4 py-2 text-xs bg-slate-100 dark:bg-slate-700 rounded-xl font-semibold">취소</button><button onclick="savePsPlayerStatModal()" class="px-4 py-2 text-xs bg-brand-600 text-white rounded-xl font-semibold shadow-sm">저장</button></div>
+        </div>
+    </div>
+
+    <!-- 중앙 메모장형 전체 평가 보기 모달 -->
+    <div id="memoModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border">
+            <div class="flex justify-between items-center border-b pb-3"><h3 id="memoModalTitle" class="font-bold text-base">전체 평가 메모장</h3><button onclick="closeMemoModal()" class="text-slate-400 text-lg font-bold">×</button></div>
+            <textarea id="memoModalTextarea" rows="8" placeholder="상세한 평가 본문을 작성하세요..." class="w-full border rounded-xl p-3 text-sm bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+            <div class="flex justify-end space-x-2"><button onclick="closeMemoModal()" class="px-4 py-2 text-xs bg-slate-100 dark:bg-slate-700 rounded-xl font-semibold">닫기</button><button onclick="saveMemoModal()" class="px-4 py-2 text-xs bg-brand-600 text-white rounded-xl font-semibold shadow-sm">저장하기</button></div>
+        </div>
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        const defaultPlayers = [
+            { id: 1, name: '문경찬', position: '불펜', hand: '우', backNum: 1, type: '공통 선수' },
+            { id: 2, name: '김태형', position: '선발투수', hand: '우', backNum: 10, type: '공통 선수' },
+            { id: 3, name: '임창용', position: '불펜', hand: '우', backNum: 12, type: '공통 선수' },
+            { id: 4, name: 'D.메이', position: '선발투수', hand: '우', backNum: 21, type: '현역' },
+            { id: 5, name: 'B.스프롯', position: '선발투수', hand: '우', backNum: 23, type: '현역' },
+            { id: 6, name: 'A.애쉬비', position: '릴리프', hand: '좌', backNum: 26, type: '현역' },
+            { id: 7, name: 'T.메길', position: '불펜', hand: '우', backNum: 29, type: '현역' },
+            { id: 8, name: 'G.스탈링스', position: '릴리프', hand: '우', backNum: 31, type: '현역' },
+            { id: 9, name: 'J.미저라우스키', position: '선발투수', hand: '우', backNum: 32, type: '현역' },
+            { id: 10, name: 'J.로메로', position: '불펜', hand: '좌', backNum: 33, type: '현역' },
+            { id: 11, name: 'A.하우저', position: '선발투수', hand: '우', backNum: 34, type: '공통 선수' },
+            { id: 12, name: 'G.앤더슨', position: '불펜', hand: '우', backNum: 35, type: '현역' },
+            { id: 13, name: 'C.고든', position: '릴리프', hand: '좌', backNum: 36, type: '현역' },
+            { id: 14, name: 'DL 홀', position: '릴리프', hand: '좌', backNum: 37, type: '현역' },
+            { id: 15, name: 'D.윌리엄스', position: '불펜', hand: '우', backNum: 38, type: '밀전드' },
+            { id: 16, name: 'C.패트릭', position: '릴리프', hand: '우', backNum: 39, type: '현역' },
+            { id: 17, name: 'N.미어스', position: '불펜', hand: '우', backNum: 40, type: '밀전드' },
+            { id: 18, name: 'B.윌슨', position: '릴리프', hand: '우', backNum: 41, type: '현역' },
+            { id: 19, name: 'L.핸더슨', position: '선발투수', hand: '우', backNum: 43, type: '현역' },
+            { id: 20, name: 'B.박스버거', position: '불펜', hand: '우', backNum: 44, type: '밀전드' },
+            { id: 21, name: 'A.유리베', position: '불펜', hand: '우', backNum: 45, type: '현역' },
+            { id: 22, name: 'J.쾨닉', position: '불펜', hand: '좌', backNum: 47, type: '현역' },
+            { id: 23, name: 'C.크네블', position: '불펜', hand: '우', backNum: 48, type: '밀전드' },
+            { id: 24, name: 'A.산자텔라', position: '불펜', hand: '우', backNum: 49, type: '현역' },
+            { id: 25, name: 'K.해리슨', position: '선발투수', hand: '좌', backNum: 52, type: '현역' },
+            { id: 26, name: 'B.우드러프', position: '선발투수', hand: '우', backNum: 53, type: '현역' },
+            { id: 27, name: '양현종', position: '선발투수', hand: '좌', backNum: 54, type: '공통 선수' },
+            { id: 28, name: 'S.드로한', position: '선발투수', hand: '좌', backNum: 55, type: '현역' },
+            { id: 29, name: 'R.개서', position: '선발투수', hand: '좌', backNum: 56, type: '현역' },
+            { id: 30, name: 'C.크로우', position: '선발투수', hand: '우', backNum: 57, type: '현역' },
+            { id: 31, name: 'R.자스트리즈니', position: '불펜', hand: '좌', backNum: 58, type: '밀전드' },
+            { id: 32, name: 'J.액스포드', position: '불펜', hand: '우', backNum: 59, type: '밀전드' },
+            { id: 33, name: 'D.카이클', position: '선발투수', hand: '좌', backNum: 60, type: '밀전드' },
+            { id: 34, name: 'Q.프리스터', position: '선발투수', hand: '우', backNum: 64, type: '현역' },
+            { id: 35, name: '성영탁', position: '불펜', hand: '우', backNum: 65, type: '공통 선수' },
+            { id: 36, name: 'J.제프리스', position: '불펜', hand: '우', backNum: 72, type: '밀전드' },
+            { id: 37, name: 'J.쿠넬', position: '불펜', hand: '우', backNum: 79, type: '현역' },
+            { id: 38, name: '심동섭', position: '불펜', hand: '좌', backNum: 81, type: '공통 선수' },
+            { id: 39, name: '김기훈', position: '릴리프', hand: '좌', backNum: 83, type: '공통 선수' },
+            { id: 40, name: '이의리', position: '선발투수', hand: '좌', backNum: 84, type: '공통 선수' },
+            { id: 41, name: 'W.웨이중', position: '불펜', hand: '좌', backNum: 85, type: '밀전드' },
+            { id: 42, name: 'A.클라우디오', position: '불펜', hand: '좌', backNum: 88, type: '밀전드' },
+            { id: 43, name: 'K.시라카와', position: '릴리프', hand: '우', backNum: 91, type: '공통 선수' },
+            { id: 44, name: 'CC 사바시아', position: '선발투수', hand: '좌', backNum: 98, type: '밀전드' },
+            { id: 45, name: '김상현', position: '선발투수', hand: '우', backNum: 0, type: '절대 선수' },
+            { id: 46, name: '마유신', position: '선발투수', hand: '우', backNum: 8, type: '절대 선수' }
+        ];
+
+        let globalPlayers = JSON.parse(JSON.stringify(defaultPlayers));
+        
+        let seasons = [
+            {
+                name: '2025 시즌',
+                targetTeam: 'team1',
+                draftState: { starter: false, relief: false, bullpen: false },
+                team1Draft: [], team2Draft: [], team1Final: [], team2Final: [],
+                savedRosterSnapshot: null,
+                gamesData: {}, postseasonGames: { ds: {}, cs: {}, ws: {} },
+                psSeriesPlayerStatus: { ds: {}, cs: {}, ws: {} },
+                seasonEval: { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', playerData: {}, firstHalfComments: {}, fullSeasonComments: {} },
+                psEval: { dsRecord: '', csRecord: '', wsRecord: '', dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', playerData: {}, dsComments: {}, csComments: {}, wsComments: {} }
+            }
+        ];
+
+        let currentActiveView = 'op';
+        let activeOpSub = 'global';
+        let activeDraftPos = 'starter';
+        let cellCtx = { sIdx: null, category: null, playerName: null, gameNum: null };
+        let psPlayerCtx = { sIdx: null, series: null, gameNum: null, playerName: null };
+        let memoCtx = { sIdx: null, evalType: null, rangeType: null, playerName: null };
+
+        // ==================== 파이어베이스 클라우드 연동 함수 ====================
+        async function loadDataFromCloud() {
+            try {
+                const docSnap = await window.firestoreModule.getDoc(window.dbDocRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data.players) globalPlayers = data.players;
+                    if (data.seasons) seasons = data.seasons;
+                    console.log("클라우드에서 데이터를 성공적으로 불러왔습니다.");
+                } else {
+                    console.log("저장된 데이터가 없어 기본 데이터를 사용합니다.");
+                    await saveStateToCloud(); 
+                }
+                refreshAppUI();
+            } catch (error) {
+                console.error("데이터 로드 중 오류 발생:", error);
+                refreshAppUI();
+            }
+        }
+
+        async function saveStateToCloud() {
+            try {
+                await window.firestoreModule.setDoc(window.dbDocRef, {
+                    players: globalPlayers,
+                    seasons: seasons
+                });
+                console.log("클라우드에 데이터가 저장되었습니다.");
+            } catch (error) {
+                console.error("데이터 저장 중 오류 발생:", error);
+            }
+        }
+
+        async function saveStateToStorage() {
+            await saveStateToCloud();
+        }
+        // ====================================================================
+
+        document.addEventListener('DOMContentLoaded', () => { initLucideIcons(); });
+        function initLucideIcons() { if (window.lucide) lucide.createIcons(); }
+        function refreshAppUI() { renderSidebarNav(); renderGlobalPlayerTable(); renderRosterCategorization(); renderBackNumMatrix(); renderDraftSubView(); renderFinalTeamViews(); renderSeasonMatrixViews(); applyActiveViewStyles(); initLucideIcons(); }
+
+        function toggleMobileMenu() {
+            const drawer = document.getElementById('mobileMenuDrawer');
+            if (drawer) drawer.classList.toggle('hidden');
+        }
+
+        function switchMainView(viewKey) { currentActiveView = viewKey; refreshAppUI(); }
+        function applyActiveViewStyles() {
+            const opSec = document.getElementById('view-op');
+            const matrixViewsContainer = document.getElementById('seasonMatrixViewsContainer');
+            const opBtn = document.getElementById('sidebar-btn-op');
+            document.querySelectorAll('.sidebar-season-btn').forEach(btn => btn.className = "sidebar-season-btn w-full rounded-xl transition hover:bg-slate-800/60");
+
+            if (currentActiveView === 'op') {
+                opSec.classList.remove('hidden'); matrixViewsContainer.classList.add('hidden');
+                if (opBtn) opBtn.className = "w-full flex items-center space-x-2.5 py-2.5 px-3 rounded-xl font-semibold text-xs transition bg-brand-600 text-white shadow-sm";
+            } else {
+                opSec.classList.add('hidden'); matrixViewsContainer.classList.remove('hidden');
+                if (opBtn) opBtn.className = "w-full flex items-center space-x-2.5 py-2.5 px-3 rounded-xl font-semibold text-xs transition bg-transparent text-slate-400 hover:text-white hover:bg-slate-800";
+                const match = currentActiveView.match(/^season_(\d+)_/);
+                if (match) {
+                    const sIdx = match[1];
+                    const activeWrapper = document.getElementById(`sidebar-season-wrapper-${sIdx}`);
+                    if (activeWrapper) activeWrapper.className = "sidebar-season-btn w-full rounded-xl transition bg-slate-800 shadow-sm";
+                }
+            }
+        }
+
+        function renderSidebarNav() {
+            const containers = [document.getElementById('sidebarSeasonList'), document.getElementById('mobileSidebarSeasonList')];
+            
+            containers.forEach(container => {
+                if (!container) return;
+                container.innerHTML = '';
+                seasons.forEach((s, idx) => {
+                    const isSelected = currentActiveView.startsWith(`season_${idx}_`);
+                    const wrapper = document.createElement('div');
+                    wrapper.id = `sidebar-season-wrapper-${idx}`;
+                    wrapper.className = `sidebar-season-btn w-full rounded-xl transition ${isSelected ? 'bg-slate-800' : 'hover:bg-slate-800/60'}`;
+                    wrapper.innerHTML = `
+                        <div class="flex items-center justify-between py-2 px-3 cursor-pointer" onclick="switchMainView('season_${idx}_reg'); toggleMobileMenu();">
+                            <span class="text-xs font-semibold text-white truncate">📅 ${s.name} (${s.targetTeam === 'team2' ? '2팀' : '1팀'})</span>
+                            <button onclick="event.stopPropagation(); deleteSeason(${idx})" class="text-slate-500 hover:text-rose-400 p-1">×</button>
+                        </div>
+                        <div class="space-y-1 px-2 pb-2 text-xs">
+                            <button onclick="switchMainView('season_${idx}_reg'); toggleMobileMenu();" class="w-full text-left py-1.5 px-2 rounded transition ${currentActiveView === `season_${idx}_reg` ? 'bg-brand-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-700'}">· 정규시즌</button>
+                            <button onclick="switchMainView('season_${idx}_eval'); toggleMobileMenu();" class="w-full text-left py-1.5 px-2 rounded transition ${currentActiveView === `season_${idx}_eval` ? 'bg-brand-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-700'}">· 시즌평가</button>
+                            <button onclick="switchMainView('season_${idx}_ps'); toggleMobileMenu();" class="w-full text-left py-1.5 px-2 rounded transition ${currentActiveView === `season_${idx}_ps` ? 'bg-brand-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-700'}">· 포스트시즌</button>
+                            <button onclick="switchMainView('season_${idx}_pseval'); toggleMobileMenu();" class="w-full text-left py-1.5 px-2 rounded transition ${currentActiveView === `season_${idx}_pseval` ? 'bg-brand-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-700'}">· PS 평가</button>
+                        </div>
+                    `;
+                    container.appendChild(wrapper);
+                });
+            });
+        }
+
+        function promptAddSeason() {
+            const name = prompt('새 시즌 이름을 입력하세요 (예: 2026 시즌):');
+            if (!name || !name.trim()) return;
+            const teamChoice = prompt('이 시즌에서 사용할 로스터 팀을 선택하세요 (1 또는 2 입력):\n1: 1팀 로스터\n2: 2팀 로스터', '1');
+            if (teamChoice !== '1' && teamChoice !== '2') return;
+
+            seasons.push({
+                name: name.trim(), targetTeam: teamChoice === '1' ? 'team1' : 'team2',
+                draftState: { starter: false, relief: false, bullpen: false },
+                team1Draft: seasons.length > 0 ? [...seasons[0].team1Draft] : [],
+                team2Draft: seasons.length > 0 ? [...seasons[0].team2Draft] : [],
+                team1Final: seasons.length > 0 ? [...seasons[0].team1Final] : [],
+                team2Final: seasons.length > 0 ? [...seasons[0].team2Final] : [],
+                savedRosterSnapshot: null, gamesData: {}, postseasonGames: { ds: {}, cs: {}, ws: {} },
+                psSeriesPlayerStatus: { ds: {}, cs: {}, ws: {} },
+                seasonEval: { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', playerData: {}, firstHalfComments: {}, fullSeasonComments: {} },
+                psEval: { dsRecord: '', csRecord: '', wsRecord: '', dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', playerData: {}, dsComments: {}, csComments: {}, wsComments: {} }
+            });
+            saveStateToStorage(); switchMainView(`season_${seasons.length - 1}_reg`);
+        }
+
+        function deleteSeason(idx) {
+            if (confirm(`[${seasons[idx].name}] 시즌을 삭제하시겠습니까?`)) {
+                seasons.splice(idx, 1);
+                if (seasons.length === 0) seasons.push({ name: '기본 시즌', targetTeam: 'team1', draftState: { starter: false, relief: false, bullpen: false }, team1Draft: [], team2Draft: [], team1Final: [], team2Final: [], savedRosterSnapshot: null, gamesData: {}, postseasonGames: { ds: {}, cs: {}, ws: {} }, psSeriesPlayerStatus: { ds: {}, cs: {}, ws: {} }, seasonEval: { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', playerData: {}, firstHalfComments: {}, fullSeasonComments: {} }, psEval: { dsRecord: '', csRecord: '', wsRecord: '', dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', playerData: {}, dsComments: {}, csComments: {}, wsComments: {} } });
+                currentActiveView = 'op'; saveStateToStorage(); refreshAppUI();
+            }
+        }
+
+        function switchOpSubTab(sub) {
+            activeOpSub = sub;
+            document.querySelectorAll('.op-sub-card').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.op-subnav-btn').forEach(btn => btn.className = "op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition text-slate-600 dark:text-slate-400 hover:text-slate-900");
+            document.getElementById(`op-subtab-${sub}`).classList.remove('hidden');
+            document.getElementById(`subnav-${sub}`).className = "op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition shadow-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white";
+        }
+
+        function getTypeBadgeHtml(type) {
+            let color = "bg-slate-100 text-slate-600";
+            if (type === '현역') color = "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300";
+            if (type === '밀전드') color = "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300";
+            if (type === '공통 선수') color = "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300";
+            if (type === '절대 선수') color = "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300";
+            if (type === '방출') color = "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400";
+            return `<span class="inline-block px-2 py-0.5 text-[11px] font-bold rounded-md ${color}">${type}</span>`;
+        }
+
+        function registerGlobalPlayer() {
+            const name = document.getElementById('inputName').value.trim();
+            const position = document.getElementById('inputPos').value;
+            const hand = document.getElementById('inputHand').value;
+            const backNum = parseInt(document.getElementById('inputBackNum').value);
+            const type = document.getElementById('inputType').value;
+            if (!name || isNaN(backNum)) return alert('선수 이름과 등번호를 올바르게 입력해주세요.');
+            if (globalPlayers.some(p => p.backNum === backNum)) return alert(`등번호 ${backNum}번은 이미 등록된 번호입니다.`);
+
+            globalPlayers.push({ id: Date.now(), name, position, hand, backNum, type });
+            document.getElementById('inputName').value = ''; document.getElementById('inputBackNum').value = '';
+            saveStateToStorage(); refreshAppUI();
+        }
+
+        function releaseGlobalPlayer(id) {
+            const p = globalPlayers.find(item => item.id === id);
+            if (p && confirm(`[${p.name}] 선수를 방출하시겠습니까?`)) { p.type = '방출'; saveStateToStorage(); refreshAppUI(); }
+        }
+
+        function savePlayerInline(id) {
+            const tr = document.getElementById(`player-row-${id}`); if (!tr) return;
+            const newName = tr.querySelector('.edit-name').value.trim();
+            const newPos = tr.querySelector('.edit-pos').value;
+            const newHand = tr.querySelector('.edit-hand').value;
+            const newBackNum = parseInt(tr.querySelector('.edit-backnum').value);
+            const newType = tr.querySelector('.edit-type').value;
+
+            if (!newName || isNaN(newBackNum)) return alert('선수 이름과 등번호를 올바르게 입력해주세요.');
+            const p = globalPlayers.find(item => item.id === id);
+            if (p) {
+                p.name = newName; p.position = newPos; p.hand = newHand; p.backNum = newBackNum; p.type = newType;
+                saveStateToStorage(); refreshAppUI(); alert(`[${newName}] 선수 정보가 수정되었습니다.`);
+            }
+        }
+
+        function renderGlobalPlayerTable() {
+            const tbody = document.getElementById('globalPlayerTableBody'); tbody.innerHTML = '';
+            const active = globalPlayers.filter(p => p.type !== '방출');
+            document.getElementById('globalPlayerCount').textContent = `총 ${active.length}명`;
+            active.forEach(p => {
+                // 모바일에서 이름 칸이 잘 보이도록 고정 너비(min-w-[120px] 등) 적용
+                tbody.innerHTML += `
+                    <tr id="player-row-${p.id}" class="hover:bg-slate-50 dark:hover:bg-slate-700/50 border-b">
+                        <td class="px-3 py-2.5 min-w-[130px]"><input type="text" value="${p.name}" class="edit-name w-full border rounded px-2 py-1.5 text-xs font-bold bg-transparent"></td>
+                        <td class="px-3 py-2.5"><select class="edit-pos border rounded px-2 py-1.5 text-xs bg-transparent"><option value="선발투수" ${p.position==='선발투수'?'selected':''}>선발투수</option><option value="릴리프" ${p.position==='릴리프'?'selected':''}>릴리프</option><option value="불펜" ${p.position==='불펜'?'selected':''}>불펜</option></select></td>
+                        <td class="px-3 py-2.5"><select class="edit-hand border rounded px-2 py-1.5 text-xs bg-transparent"><option value="우" ${p.hand==='우'?'selected':''}>우</option><option value="좌" ${p.hand==='좌'?'selected':''}>좌</option></select></td>
+                        <td class="px-3 py-2.5"><input type="number" value="${p.backNum}" class="edit-backnum w-16 border rounded px-2 py-1.5 text-xs font-mono bg-transparent"></td>
+                        <td class="px-3 py-2.5"><select class="edit-type border rounded px-2 py-1.5 text-xs bg-transparent"><option value="현역" ${p.type==='현역'?'selected':''}>현역</option><option value="밀전드" ${p.type==='밀전드'?'selected':''}>밀전드</option><option value="공통 선수" ${p.type==='공통 선수'?'selected':''}>공통 선수</option><option value="절대 선수" ${p.type==='절대 선수'?'selected':''}>절대 선수</option></select></td>
+                        <td class="px-3 py-2.5 text-right space-x-1 whitespace-nowrap"><button onclick="savePlayerInline(${p.id})" class="text-white text-xs px-2.5 py-1.5 bg-brand-600 rounded-lg shadow-sm">수정</button><button onclick="releaseGlobalPlayer(${p.id})" class="text-xs px-2.5 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-lg border">방출</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderBackNumMatrix() {
+            const headTr = document.getElementById('backNumMatrixHead');
+            const tbody = document.getElementById('backNumMatrixBody');
+            if (!headTr || !tbody) return;
+
+            headTr.innerHTML = '<th class="p-2 border bg-slate-200 dark:bg-slate-800">#</th>';
+            for (let d = 0; d <= 9; d++) {
+                headTr.innerHTML += `<th class="p-2 border bg-slate-200 dark:bg-slate-800">${d}X</th>`;
+            }
+
+            tbody.innerHTML = '';
+            for (let r = 0; r <= 9; r++) {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `<td class="p-2 font-bold bg-slate-100 dark:bg-slate-800 border">${r}</td>`;
+                for (let c = 0; c <= 9; c++) {
+                    let targetNum = (c * 10) + r;
+                    let foundPlayer = globalPlayers.find(p => p.backNum === targetNum);
+                    let cellBg = '';
+                    let playerName = '';
+
+                    if (foundPlayer) {
+                        playerName = foundPlayer.name;
+                        if (foundPlayer.type === '현역') cellBg = 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 font-bold';
+                        else if (foundPlayer.type === '밀전드') cellBg = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold';
+                        else if (foundPlayer.type === '공통 선수') cellBg = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold';
+                        else if (foundPlayer.type === '절대 선수') cellBg = 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-bold';
+                        else if (foundPlayer.type === '방출') cellBg = 'bg-slate-300 text-slate-600 dark:bg-slate-800 dark:text-slate-400 font-medium';
+                    }
+
+                    tr.innerHTML += `<td class="p-2 border h-10 align-middle text-[11px] truncate max-w-[70px] ${cellBg}" title="${playerName}">${playerName}</td>`;
+                }
+                tbody.appendChild(tr);
+            }
+        }
+
+        function sortRosterCategoryList(list) {
+            const absolutes = list.filter(p => p.type === '절대 선수');
+            const activesAndMilends = list.filter(p => p.type === '현역' || p.type === '밀전드');
+            const lefties = activesAndMilends.filter(p => p.hand === '좌');
+            const righties = activesAndMilends.filter(p => p.hand !== '좌');
+            const commons = list.filter(p => p.type === '공통 선수');
+            return [...absolutes, ...lefties, ...righties, ...commons];
+        }
+
+        function sortMatrixPlayers(playersList) {
+            const posOrder = { '선발투수': 1, '릴리프': 2, '불펜': 3 };
+            const typeRank = { '절대 선수': 1, '현역': 2, '밀전드': 2, '공통 선수': 3 };
+            return [...playersList].sort((a, b) => {
+                if ((posOrder[a.position] || 99) !== (posOrder[b.position] || 99)) return (posOrder[a.position] || 99) - (posOrder[b.position] || 99);
+                if ((typeRank[a.type] || 99) !== (typeRank[b.type] || 99)) return (typeRank[a.type] || 99) - (typeRank[b.type] || 99);
+                return (a.backNum || 0) - (b.backNum || 0);
+            });
+        }
+
+        function renderRosterCategorization() {
+            const active = globalPlayers.filter(p => p.type !== '방출');
+            const starters = sortRosterCategoryList(active.filter(p => p.position === '선발투수'));
+            const reliefs = sortRosterCategoryList(active.filter(p => p.position === '릴리프'));
+            const bullpens = sortRosterCategoryList(active.filter(p => p.position === '불펜'));
+            const released = globalPlayers.filter(p => p.type === '방출');
+
+            renderRosterCategoryRows('rosterStarterBody', starters); document.getElementById('rosterStarterCount').textContent = `${starters.length}명`;
+            renderRosterCategoryRows('rosterReliefBody', reliefs); document.getElementById('rosterReliefCount').textContent = `${reliefs.length}명`;
+            renderRosterCategoryRows('rosterBullpenBody', bullpens); document.getElementById('rosterBullpenCount').textContent = `${bullpens.length}명`;
+
+            const relBody = document.getElementById('rosterReleaseBody'); relBody.innerHTML = '';
+            document.getElementById('rosterReleaseCount').textContent = `${released.length}명`;
+            released.forEach(p => relBody.innerHTML += `<tr><td class="p-2.5 font-bold text-slate-500">${p.name}</td><td class="p-2.5">${p.position}</td><td class="p-2.5">${p.hand}</td><td class="p-2.5 font-mono">#${p.backNum}</td><td class="p-2.5">${getTypeBadgeHtml(p.type)}</td></tr>`);
+        }
+
+        function renderRosterCategoryRows(tbodyId, players) {
+            const tbody = document.getElementById(tbodyId); if (!tbody) return; tbody.innerHTML = '';
+            players.forEach(p => tbody.innerHTML += `<tr><td class="p-2.5 font-bold">${p.name}</td><td class="p-2.5">${p.hand}</td><td class="p-2.5 font-mono">#${p.backNum}</td><td class="p-2.5">${getTypeBadgeHtml(p.type)}</td></tr>`);
+        }
+
+        function switchDraftPos(pos) {
+            activeDraftPos = pos;
+            document.querySelectorAll('.draft-pos-btn').forEach(btn => btn.className = "draft-pos-btn flex-1 md:flex-none py-2 px-4 text-xs font-semibold rounded-lg text-slate-600");
+            document.getElementById(`draft-pos-${pos}`).className = "draft-pos-btn flex-1 md:flex-none py-2 px-4 text-xs font-semibold rounded-lg bg-white shadow-sm";
+            renderDraftSubView();
+        }
+
+        function renderDraftSubView() {
+            const posMap = { starter: '선발투수', relief: '릴리프', bullpen: '불펜' };
+            const posName = posMap[activeDraftPos];
+            document.getElementById('draftEligibleTitle').textContent = `${posName} 드래프트 대기 선수 목록`;
+            const candidates = globalPlayers.filter(p => (p.type === '현역' || p.type === '밀전드') && p.position === posName);
+            const tbody = document.getElementById('draftEligibleBody'); tbody.innerHTML = '';
+            document.getElementById('draftEligibleCount').textContent = `${candidates.length}명`;
+            candidates.forEach(p => tbody.innerHTML += `<tr><td class="p-2.5 font-bold">${p.name}</td><td class="p-2.5">${p.position}</td><td class="p-2.5">${p.hand}</td><td class="p-2.5 font-mono">#${p.backNum}</td><td class="p-2.5">${getTypeBadgeHtml(p.type)}</td></tr>`);
+
+            const s = seasons[0] || {};
+            renderDraftTeamTable('team1DraftBody', s.team1Draft || []);
+            renderDraftTeamTable('team2DraftBody', s.team2Draft || []);
+            document.getElementById('team1DraftCount').textContent = `${(s.team1Draft || []).length}명`;
+            document.getElementById('team2DraftCount').textContent = `${(s.team2Draft || []).length}명`;
+        }
+
+        function renderDraftTeamTable(tbodyId, list) {
+            const tbody = document.getElementById(tbodyId); tbody.innerHTML = '';
+            list.forEach(p => tbody.innerHTML += `<tr><td class="p-2.5 font-bold">${p.name}</td><td class="p-2.5">${p.position}</td><td class="p-2.5">${p.hand}</td><td class="p-2.5 font-mono">#${p.backNum}</td><td class="p-2.5">${getTypeBadgeHtml(p.type)}</td></tr>`);
+        }
+
+        function executeRandomDraft() {
+            const posMap = { starter: '선발투수', relief: '릴리프', bullpen: '불펜' };
+            const targetPos = posMap[activeDraftPos];
+            const candidates = globalPlayers.filter(p => (p.type === '현역' || p.type === '밀전드') && p.position === targetPos);
+            if (candidates.length === 0) return alert('드래프트 지명 대상 선수가 없습니다.');
+            let shuffled = [...candidates].sort(() => 0.5 - Math.random());
+            const half = Math.floor(shuffled.length / 2);
+            seasons.forEach(s => {
+                s.team1Draft = (s.team1Draft || []).filter(p => p.position !== targetPos).concat(shuffled.slice(0, half));
+                s.team2Draft = (s.team2Draft || []).filter(p => p.position !== targetPos).concat(shuffled.slice(half));
+            });
+            saveStateToStorage(); refreshAppUI(); alert(`[${targetPos}] 무작위 균등 드래프트가 완료되었습니다.`);
+        }
+
+        function executeRosterInspection() {
+            const absolutes = globalPlayers.filter(p => p.type === '절대 선수');
+            const commons = globalPlayers.filter(p => p.type === '공통 선수');
+            seasons.forEach(s => {
+                s.team1Final = [...absolutes, ...(s.team1Draft || []), ...commons];
+                s.team2Final = [...absolutes, ...(s.team2Draft || []), ...commons];
+            });
+            saveStateToStorage(); refreshAppUI(); alert('로스터 점검 완료: 절대 선수 및 공통 선수가 1팀과 2팀 로스터에 모두 합류되었습니다.');
+        }
+
+        function saveFinalRosters() { saveStateToStorage(); alert('최종 저장되었습니다.'); }
+
+        function renderFinalTeamViews() {
+            const s = seasons[0] || {};
+            renderSingleTeamFinalView('team1FinalTableBody', 'team1FinalTotalCount', s.team1Final || []);
+            renderSingleTeamFinalView('team2FinalTableBody', 'team2FinalTotalCount', s.team2Final || []);
+        }
+
+        function renderSingleTeamFinalView(tbodyId, countId, rawList) {
+            const tbody = document.getElementById(tbodyId); tbody.innerHTML = '';
+            document.getElementById(countId).textContent = `총 ${rawList.length}명`;
+            if (rawList.length === 0) return;
+            const posOrder = ['선발투수', '릴리프', '불펜'];
+            const typeRank = { '절대 선수': 1, '현역': 2, '밀전드': 2, '공통 선수': 3 };
+            posOrder.forEach(pos => {
+                const group = rawList.filter(p => p.position === pos);
+                group.sort((a, b) => (typeRank[a.type] || 99) - (typeRank[b.type] || 99) || a.backNum - b.backNum);
+                group.forEach(p => {
+                    tbody.innerHTML += `<tr><td class="px-4 py-3 font-bold">${p.position}</td><td class="px-4 py-3 font-bold">${p.name}</td><td class="px-4 py-3">${p.hand}</td><td class="px-4 py-3 font-mono">#${p.backNum}</td><td class="px-4 py-3">${getTypeBadgeHtml(p.type)}</td></tr>`;
+                });
+            });
+        }
+
+        function getSeasonEffectiveRoster(season) {
+            if (season.savedRosterSnapshot && season.savedRosterSnapshot.length > 0) return season.savedRosterSnapshot;
+            let rawList = season.targetTeam === 'team2' ? season.team2Final : season.team1Final;
+            if (!rawList || rawList.length === 0) rawList = globalPlayers.filter(p => p.type !== '방출');
+            return rawList;
+        }
+
+        function saveSeasonRosterSnapshot(sIdx) {
+            const season = seasons[sIdx];
+            let currentList = season.targetTeam === 'team2' ? season.team2Final : season.team1Final;
+            if (!currentList || currentList.length === 0) currentList = globalPlayers.filter(p => p.type !== '방출');
+            season.savedRosterSnapshot = JSON.parse(JSON.stringify(currentList));
+            saveStateToStorage(); refreshAppUI(); alert(`[${season.name}] 로스터가 고정 저장되었습니다.`);
+        }
+
+        function getGrandMasterTimeline() {
+            let timeline = [];
+            for (let g = 1; g <= 84; g++) timeline.push({ category: 'reg', type: 'game', gNum: g, label: `${g}G` });
+            for (let ab = 1; ab <= 6; ab++) timeline.push({ category: 'reg', type: 'allstar', gNum: null, label: `ASB${ab}` });
+            for (let g = 85; g <= 160; g++) timeline.push({ category: 'reg', type: 'game', gNum: g, label: `${g}G` });
+            return timeline;
+        }
+
+        function computePlayerTimelineStatus(season, playerName) {
+            const timeline = getGrandMasterTimeline();
+            let statusMap = new Array(timeline.length).fill(null);
+            let explicitMap = {};
+
+            if (season.gamesData && season.gamesData['reg'] && season.gamesData['reg'][playerName]) {
+                const pData = season.gamesData['reg'][playerName];
+                Object.keys(pData).forEach(gStr => {
+                    let gNum = parseInt(gStr);
+                    let idx = timeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === gNum);
+                    if (idx !== -1) explicitMap[idx] = pData[gNum];
+                });
+            }
+
+            let i = 0;
+            while (i < timeline.length) {
+                let tItem = timeline[i];
+                if (tItem.type === 'allstar') {
+                    statusMap[i] = { status: null, comment: '올스타 브레이크' };
+                    i++;
+                    continue;
+                }
+
+                if (explicitMap[i]) {
+                    let trig = explicitMap[i];
+                    let st = trig.status;
+                    let comment = trig.comment;
+                    let isRegFirstGame = (tItem.gNum === 1);
+
+                    let duration = 0;
+                    if (st === '마이너') {
+                        duration = (comment.includes('최신화')) ? 1 : (isRegFirstGame ? 1 : 10);
+                    } else if (st === '부상 15일') duration = 15;
+                    else if (st === '부상 30일') duration = 30;
+                    else if (st === '부상 60일') duration = 60;
+                    else if (st === '시즌아웃' || st === '토미존') duration = 99999;
+                    else if (st === '메이저') duration = 1;
+
+                    let filled = 0;
+                    let curIdx = i;
+                    while (curIdx < timeline.length && filled < duration) {
+                        let curT = timeline[curIdx];
+                        if (curT.type === 'allstar') {
+                            statusMap[curIdx] = { status: st, comment: '올스타 브레이크 소모' };
+                            curIdx++;
+                            continue;
+                        }
+
+                        let dispSt = st;
+                        let dispCom = (filled === 0) ? comment : (st === '마이너' ? '최소 등록 기간' : '기간 자동 연장');
+                        statusMap[curIdx] = { status: dispSt, comment: dispCom };
+                        filled++;
+                        curIdx++;
+                    }
+                    i = curIdx;
+                } else {
+                    statusMap[i] = null;
+                    i++;
+                }
+            }
+            return { timeline, statusMap };
+        }
+
+        function getPlayerCarryoverStatus(season, playerName) {
+            const { timeline, statusMap } = computePlayerTimelineStatus(season, playerName);
+            let activeStatus = null;
+            let remainingDays = 0;
+
+            for (let i = 0; i < timeline.length; i++) {
+                let stInfo = statusMap[i];
+                if (stInfo && stInfo.status) {
+                    activeStatus = stInfo.status;
+                    let baseTrig = season.gamesData?.['reg']?.[playerName]?.[timeline[i].gNum];
+                    if (baseTrig && baseTrig.status === activeStatus) {
+                        let isRegFirstGame = (timeline[i].gNum === 1);
+                        if (activeStatus === '마이너') remainingDays = isRegFirstGame ? 1 : 10;
+                        else if (activeStatus === '부상 15일') remainingDays = 15;
+                        else if (activeStatus === '부상 30일') remainingDays = 30;
+                        else if (activeStatus === '부상 60일') remainingDays = 60;
+                        else if (activeStatus === '시즌아웃' || activeStatus === '토미존') remainingDays = 99999;
+                    }
+                }
+                if (activeStatus) remainingDays--;
+                if (remainingDays <= 0) activeStatus = null;
+            }
+            return { activeStatus, remainingDays: Math.max(0, remainingDays) };
+        }
+
+        function computePlayerStatsSummary(season, playerName, rangeType) {
+            const { timeline, statusMap } = computePlayerTimelineStatus(season, playerName);
+            let majorDays = 0, minorDays = 0, injuryDays = 0;
+            timeline.forEach((t, idx) => {
+                if (t.type === 'game') {
+                    if (rangeType === 'firstHalf' && t.gNum > 84) return;
+                    let stInfo = statusMap[idx];
+                    if (stInfo && stInfo.status) {
+                        let st = stInfo.status;
+                        if (st === '메이저') majorDays++;
+                        else if (st === '마이너') minorDays++;
+                        else if (st.includes('부상') || st === '시즌아웃' || st === '토미존') injuryDays++;
+                    }
+                }
+            });
+            return { majorDays, minorDays, injuryDays };
+        }
+
+        function renderSeasonMatrixViews() {
+            const container = document.getElementById('seasonMatrixViewsContainer'); container.innerHTML = '';
+            seasons.forEach((s, sIdx) => {
+                const effectiveRawList = getSeasonEffectiveRoster(s);
+                const matrixPlayers = sortMatrixPlayers(effectiveRawList.filter(p => p.type !== '방출'));
+
+                const regDiv = document.createElement('section');
+                regDiv.className = `space-y-6 max-w-7xl mx-auto ${currentActiveView === `season_${sIdx}_reg` ? '' : 'hidden'}`;
+                regDiv.innerHTML = `
+                    <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div><h2 class="text-base sm:text-lg font-bold">📅 ${s.name} 정규 시즌 현황</h2><p class="text-xs text-slate-500">정규시즌(160G)</p></div>
+                        <button onclick="saveSeasonRosterSnapshot(${sIdx})" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold py-2 px-3.5 rounded-xl shadow-sm">시즌 로스터 저장 (고정)</button>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto custom-scrollbar max-h-[550px]">
+                            <table class="text-xs text-center border-collapse"><thead class="bg-slate-50 dark:bg-slate-900 sticky top-0 z-20 text-slate-500"><tr id="matrix-head-reg-${sIdx}"></tr></thead><tbody id="matrix-body-reg-${sIdx}" class="divide-y"></tbody></table>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(regDiv); buildRegMatrixTable(sIdx, matrixPlayers);
+
+                const evalDiv = document.createElement('section');
+                evalDiv.className = `space-y-6 max-w-7xl mx-auto ${currentActiveView === `season_${sIdx}_eval` ? '' : 'hidden'}`;
+                evalDiv.innerHTML = renderSeasonEvalHtml(s, sIdx, matrixPlayers);
+                container.appendChild(evalDiv);
+
+                const psDiv = document.createElement('section');
+                psDiv.className = `space-y-6 max-w-7xl mx-auto ${currentActiveView === `season_${sIdx}_ps` ? '' : 'hidden'}`;
+                psDiv.innerHTML = renderPostseasonHtml(s, sIdx, matrixPlayers);
+                container.appendChild(psDiv);
+
+                const psevalDiv = document.createElement('section');
+                psevalDiv.className = `space-y-6 max-w-7xl mx-auto ${currentActiveView === `season_${sIdx}_pseval` ? '' : 'hidden'}`;
+                psevalDiv.innerHTML = renderPsEvalHtml(s, sIdx, matrixPlayers);
+                container.appendChild(psevalDiv);
+            });
+        }
+
+        function buildRegMatrixTable(sIdx, players) {
+            const headTr = document.getElementById(`matrix-head-reg-${sIdx}`);
+            const tbody = document.getElementById(`matrix-body-reg-${sIdx}`);
+            if (!headTr || !tbody) return;
+            headTr.innerHTML = '<th class="p-2.5 text-left min-w-[130px] sticky-col bg-slate-50 dark:bg-slate-900 shadow-sm">선수 정보</th>';
+            for (let g = 1; g <= 84; g++) headTr.innerHTML += `<th class="p-2 min-w-[42px] border-l cursor-pointer hover:bg-brand-50" onclick="triggerUpdateUpToGame(${sIdx}, ${g})">${g}G</th>`;
+            for (let ab = 1; ab <= 6; ab++) headTr.innerHTML += `<th class="p-1 min-w-[32px] border-l bg-amber-50 dark:bg-amber-950 text-amber-600 text-[10px]">ASB${ab}</th>`;
+            for (let g = 85; g <= 160; g++) headTr.innerHTML += `<th class="p-2 min-w-[42px] border-l cursor-pointer hover:bg-brand-50" onclick="triggerUpdateUpToGame(${sIdx}, ${g})">${g}G</th>`;
+
+            const season = seasons[sIdx]; let lastPos = null;
+            players.forEach(p => {
+                if (lastPos && lastPos !== p.position) {
+                    const spacerTr = document.createElement('tr'); spacerTr.className = "bg-slate-100/60 dark:bg-slate-800 h-2.5"; spacerTr.innerHTML = `<td colspan="167"></td>`; tbody.appendChild(spacerTr);
+                }
+                lastPos = p.position;
+                const tr = document.createElement('tr'); const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name);
+                
+                let latestActiveStatus = null;
+                for (let idx = statusMap.length - 1; idx >= 0; idx--) {
+                    if (statusMap[idx] && statusMap[idx].status) {
+                        latestActiveStatus = statusMap[idx].status;
+                        break;
+                    }
+                }
+                let dotColorClass = 'bg-slate-300';
+                if (latestActiveStatus === '메이저') dotColorClass = 'bg-blue-500';
+                else if (latestActiveStatus === '마이너') dotColorClass = 'bg-amber-500';
+                else if (latestActiveStatus && (latestActiveStatus.includes('부상') || latestActiveStatus === '시즌아웃' || latestActiveStatus === '토미존')) dotColorClass = 'bg-rose-500';
+
+                tr.innerHTML = `
+                    <td class="p-2 text-left sticky-col bg-white dark:bg-slate-800 shadow-sm border-r">
+                        <div class="flex items-center space-x-1.5">
+                            <span class="inline-block w-2.5 h-2.5 rounded-full ${dotColorClass}" title="현재 상태: ${latestActiveStatus || '미등록'}"></span>
+                            <div class="font-bold truncate max-w-[85px]">${p.name}</div>
+                        </div>
+                        <div class="text-[9px] text-slate-400 pl-4">${p.position} (${p.hand})</div>
+                    </td>
+                `;
+
+                timeline.forEach((item, idx) => {
+                    const td = document.createElement('td'); const activeInfo = statusMap[idx];
+                    if (item.type === 'allstar') { td.className = "p-1 border-l bg-amber-50/50 dark:bg-amber-950/40 text-center text-[8px] font-bold text-amber-600"; td.textContent = 'ASB'; }
+                    else {
+                        td.className = "p-1 border-l hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-center";
+                        if (activeInfo && activeInfo.status) {
+                            let st = activeInfo.status;
+                            let badgeLabel = st;
+                            let style = 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300';
+                            
+                            if (st === '메이저') { badgeLabel = '메이저'; style = 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'; }
+                            else if (st === '마이너') { badgeLabel = '마이너'; style = 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'; }
+                            else if (st === '부상 15일') badgeLabel = 'IL-15';
+                            else if (st === '부상 30일') badgeLabel = 'IL-30';
+                            else if (st === '부상 60일') badgeLabel = 'IL-60';
+                            else if (st === '시즌아웃') badgeLabel = 'OUT';
+                            else if (st === '토미존') badgeLabel = 'TJS';
+
+                            td.innerHTML = `<span class="inline-block px-1 py-0.5 text-[9px] font-bold rounded border ${style}">${badgeLabel}</span>`;
+                        }
+                        td.onclick = () => openModal(sIdx, 'reg', p.name, item.gNum);
+                    }
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderSeasonEvalHtml(s, sIdx, players) {
+            const ev = s.seasonEval || {};
+            return `
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border shadow-sm space-y-6">
+                    <h2 class="text-base sm:text-lg font-bold">📊 ${s.name} 시즌 평가</h2>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border"><label class="text-[10px] text-slate-500">팀 순위</label><input type="text" value="${ev.teamRank || ''}" onchange="updateTeamEval(${sIdx}, 'teamRank', this.value)" class="w-full bg-transparent font-bold text-sm"></div>
+                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border"><label class="text-[10px] text-slate-500">승 - 패</label><input type="text" value="${ev.win || ''}" onchange="updateTeamEval(${sIdx}, 'win', this.value)" class="w-full bg-transparent font-bold text-sm" placeholder="승-패"></div>
+                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border"><label class="text-[10px] text-slate-500">승률</label><input type="text" value="${ev.winRate || ''}" onchange="updateTeamEval(${sIdx}, 'winRate', this.value)" class="w-full bg-transparent font-bold text-sm"></div>
+                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border"><label class="text-[10px] text-slate-500">팀 ERA</label><input type="text" value="${ev.teamEra || ''}" onchange="updateTeamEval(${sIdx}, 'teamEra', this.value)" class="w-full bg-transparent font-bold text-sm"></div>
+                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border"><label class="text-[10px] text-slate-500">팀 OPS</label><input type="text" value="${ev.teamOps || ''}" onchange="updateTeamEval(${sIdx}, 'teamOps', this.value)" class="w-full bg-transparent font-bold text-sm"></div>
+                    </div>
+                    <div class="space-y-3"><h3 class="font-bold text-sm text-brand-600">📌 전반기 평가 (1G ~ 84G)</h3><div class="overflow-x-auto border rounded-2xl"><table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'firstHalf')}</table></div></div>
+                    <div class="space-y-3 pt-4"><h3 class="font-bold text-sm text-purple-600">📌 전체 시즌 평가 (1G ~ 160G)</h3><div class="overflow-x-auto border rounded-2xl"><table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'fullSeason')}</table></div></div>
+                </div>
+            `;
+        }
+
+        function renderPlayerEvalTableContent(s, sIdx, rangeType) {
+            const players = sortMatrixPlayers(getSeasonEffectiveRoster(s).filter(p => p.type !== '방출'));
+            let html = `
+                <thead class="bg-slate-50 dark:bg-slate-900 text-slate-500 border-b">
+                    <tr>
+                        <th class="p-2.5">선수 정보</th><th class="p-2.5">등록 현황</th>
+                        <th class="p-2.5 text-center">ERA</th><th class="p-2.5 text-center">IP</th><th class="p-2.5 text-center">K</th><th class="p-2.5 text-center">승리</th><th class="p-2.5 text-center">패배</th>
+                        <th class="p-2.5 text-center">홀드</th><th class="p-2.5 text-center">세이브</th><th class="p-2.5 text-center">WHIP</th><th class="p-2.5 text-center">K/9</th><th class="p-2.5 text-center">QS</th><th class="p-2.5 text-center">WAR</th>
+                        <th class="p-2.5">코멘트 제목 및 평가</th>
+                    </tr>
+                </thead><tbody class="divide-y">
+            `;
+            players.forEach(p => {
+                const stats = computePlayerStatsSummary(s, p.name, rangeType);
+                const commentData = s.seasonEval[rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments']?.[p.name] || { title: '', body: '' };
+                const statKey = `${rangeType}_${p.name}`;
+                const userStats = s.seasonEval.playerData?.[statKey] || {};
+
+                html += `
+                    <tr>
+                        <td class="p-2.5 font-bold">${p.name}<br><span class="text-[9px] text-slate-400">${p.position} (${p.hand})</span></td>
+                        <td class="p-2.5 whitespace-nowrap"><span class="text-blue-600 font-semibold">메이저: ${stats.majorDays}일</span><br><span class="text-amber-600 font-semibold">마이너: ${stats.minorDays}일</span><br><span class="text-rose-600 font-semibold">부상: ${stats.injuryDays}일</span></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.era || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'era', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.ip || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'ip', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.k || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'k', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.win || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'win', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.loss || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'loss', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.hold || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'hold', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.save || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'save', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.whip || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'whip', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.k9 || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'k9', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.qs || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'qs', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5 text-center"><input type="text" value="${userStats.war || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'war', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
+                        <td class="p-2.5">
+                            <input type="text" value="${commentData.title || ''}" onchange="updateCommentTitle(${sIdx}, '${rangeType}', '${p.name}', this.value)" placeholder="제목" class="w-32 border rounded px-2 py-1 mb-1 font-bold bg-transparent">
+                            <br><button onclick="openMemoModal(${sIdx}, 'seasonEval', '${rangeType}', '${p.name}')" class="text-[11px] text-brand-600 underline font-semibold">전체 평가 보기</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            html += `</tbody>`;
+            return html;
+        }
+
+        function renderPostseasonHtml(s, sIdx, players) {
+            return `
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border shadow-sm space-y-6">
+                    <div>
+                        <h2 class="text-base sm:text-lg font-bold">🏆 ${s.name} 포스트시즌 현황</h2>
+                        <p class="text-xs text-slate-500">시리즈별 상태('등록' / '부상' / '미등록') 및 N차전 셀 클릭 시 승/패/홀드/세이브/등판/블론 성적을 관리하세요.</p>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        ${renderPsMatrixBox(s, sIdx, 'ds', '디비전 시리즈 (DS 1G ~ 5G)', 5, players)}
+                        ${renderPsMatrixBox(s, sIdx, 'cs', '챔피언십 시리즈 (CS 1G ~ 7G)', 7, players)}
+                        ${renderPsMatrixBox(s, sIdx, 'ws', '월드 시리즈 (WS 1G ~ 7G)', 7, players)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPsMatrixBox(s, sIdx, seriesKey, title, maxG, players) {
+            let html = `
+                <div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border space-y-3">
+                    <h3 class="font-bold text-sm">${title}</h3>
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-xs text-center border-collapse">
+                            <thead class="bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                <tr>
+                                    <th class="p-2 text-left min-w-[100px]">선수 (상태)</th>
+            `;
+            for (let g = 1; g <= maxG; g++) {
+                html += `<th class="p-2 min-w-[42px] border-l font-bold">${g}차전</th>`;
+            }
+            html += `</tr></thead><tbody class="divide-y">`;
+
+            if (!s.psSeriesPlayerStatus) s.psSeriesPlayerStatus = { ds: {}, cs: {}, ws: {} };
+            if (!s.psSeriesPlayerStatus[seriesKey]) s.psSeriesPlayerStatus[seriesKey] = {};
+
+            let seriesCarryover = {};
+            if (seriesKey === 'ds') {
+                players.forEach(p => {
+                    let carry = getPlayerCarryoverStatus(s, p.name);
+                    if (carry.activeStatus && carry.remainingDays > 0) {
+                        seriesCarryover[p.name] = { status: carry.activeStatus, left: carry.remainingDays };
+                    }
+                });
+            } else if (seriesKey === 'cs' || seriesKey === 'ws') {
+                let prevSeriesKey = seriesKey === 'cs' ? 'ds' : 'cs';
+                let prevMaxG = seriesKey === 'cs' ? 5 : 7;
+                
+                players.forEach(p => {
+                    let prevStatusMap = s[`_${prevSeriesKey}_computedStatus_${p.name}`] || {};
+                    let lastDayStatus = prevStatusMap[prevMaxG];
+                    let lastDayLeft = prevStatusMap[`${prevMaxG}_left`] || 0;
+
+                    if (lastDayStatus && lastDayLeft > 0) {
+                        seriesCarryover[p.name] = { status: lastDayStatus, left: lastDayLeft };
+                    }
+                });
+            }
+
+            players.forEach(p => {
+                let carryInfo = seriesCarryover[p.name];
+                let userManualStatus = s.psSeriesPlayerStatus[seriesKey]?.[p.name];
+
+                let effectiveStatus = userManualStatus || '미등록';
+                if (!userManualStatus) {
+                    if (carryInfo && carryInfo.left > 0) {
+                        effectiveStatus = '부상';
+                    }
+                }
+
+                let dotColor = effectiveStatus === '등록' ? 'bg-blue-500' : (effectiveStatus === '부상' ? 'bg-rose-500' : 'bg-amber-400');
+                let rowBgStyle = (effectiveStatus === '미등록' || effectiveStatus === '부상') ? 'bg-slate-200/70 dark:bg-slate-800/80 text-slate-400' : '';
+
+                html += `
+                    <tr class="${rowBgStyle}">
+                        <td class="p-2 text-left font-bold flex items-center justify-between border-r">
+                            <span class="truncate max-w-[75px]" title="${p.name}">${p.name}</span>
+                            <span onclick="cyclePsPlayerStatus(${sIdx}, '${seriesKey}', '${p.name}')" class="inline-block w-3 h-3 rounded-full ${dotColor} cursor-pointer" title="클릭 시 상태변경 (등록->부상->미등록)"></span>
+                        </td>
+                `;
+
+                let curCarryLeft = carryInfo ? carryInfo.left : 0;
+                let curCarryStatus = carryInfo ? carryInfo.status : null;
+                let playerTimelineStatusMap = {};
+
+                for (let g = 1; g <= maxG; g++) {
+                    let pGameRec = s.postseasonGames?.[seriesKey]?.[g]?.players?.[p.name];
+                    let cellText = '';
+                    let cellClass = 'text-slate-400';
+
+                    if (effectiveStatus === '부상' && curCarryLeft > 0) {
+                        let badgeLbl = curCarryStatus;
+                        if (badgeLbl === '부상 15일') badgeLbl = 'IL-15';
+                        else if (badgeLbl === '부상 30일') badgeLbl = 'IL-30';
+                        else if (badgeLbl === '부상 60일') badgeLbl = 'IL-60';
+                        else if (badgeLbl === '시즌아웃') badgeLbl = 'OUT';
+                        else if (badgeLbl === '토미존') badgeLbl = 'TJS';
+                        else if (badgeLbl === '마이너') badgeLbl = '마이너';
+
+                        cellText = badgeLbl;
+                        cellClass = 'text-rose-600 font-bold text-[9px] bg-rose-50 dark:bg-rose-950 px-1 rounded';
+                        playerTimelineStatusMap[g] = curCarryStatus;
+                        curCarryLeft--;
+                    } else {
+                        if (pGameRec && pGameRec.stat) {
+                            if (pGameRec.stat === '승') { cellText = '승'; cellClass = 'text-blue-600 font-bold bg-blue-50 dark:bg-blue-950 px-1 rounded'; }
+                            else if (pGameRec.stat === '패') { cellText = '패'; cellClass = 'text-rose-600 font-bold bg-rose-50 dark:bg-rose-950 px-1 rounded'; }
+                            else if (pGameRec.stat === '홀드') { cellText = '홀드'; cellClass = 'text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950 px-1 rounded'; }
+                            else if (pGameRec.stat === '세이브') { cellText = '세이브'; cellClass = 'text-purple-600 font-bold bg-purple-50 dark:bg-purple-950 px-1 rounded'; }
+                            else if (pGameRec.stat === '등판') { cellText = 'ND'; cellClass = 'text-slate-600 font-bold bg-slate-100 dark:bg-slate-800 px-1 rounded'; }
+                            else if (pGameRec.stat === '블론') { cellText = 'BS'; cellClass = 'text-amber-600 font-bold bg-amber-50 dark:bg-amber-950 px-1 rounded'; }
+                        }
+                    }
+                    playerTimelineStatusMap[`${g}_left`] = curCarryLeft;
+
+                    html += `
+                        <td class="p-1 border-l hover:bg-slate-300/40 dark:hover:bg-slate-700 cursor-pointer text-center" onclick="openPsPlayerStatModal(${sIdx}, '${seriesKey}', ${g}, '${p.name}')">
+                            <span class="text-[10px] ${cellClass}">${cellText}</span>
+                        </td>
+                    `;
+                }
+                s[`_${seriesKey}_computedStatus_${p.name}`] = playerTimelineStatusMap;
+                html += `</tr>`;
+            });
+            html += `</tbody></table></div></div>`;
+            return html;
+        }
+
+        function renderPsEvalHtml(s, sIdx, players) {
+            const psev = s.psEval || {};
+            if (!s.psSeriesPlayerStatus) s.psSeriesPlayerStatus = { ds: {}, cs: {}, ws: {} };
+            const dsRegistered = players.filter(p => (s.psSeriesPlayerStatus.ds?.[p.name] || '미등록') === '등록');
+            const csRegistered = players.filter(p => (s.psSeriesPlayerStatus.cs?.[p.name] || '미등록') === '등록');
+            const wsRegistered = players.filter(p => (s.psSeriesPlayerStatus.ws?.[p.name] || '미등록') === '등록');
+
+            return `
+                <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border shadow-sm space-y-6">
+                    <h2 class="text-base sm:text-lg font-bold">🏅 ${s.name} 포스트시즌 평가</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border flex justify-between items-center"><input type="text" value="${psev.dsRecord || ''}" onchange="updatePsEvalHead(${sIdx}, 'dsRecord', this.value)" placeholder="DS 성적" class="bg-transparent font-bold text-sm w-28"><select onchange="updatePsEvalHead(${sIdx}, 'dsStatus', this.value)" class="text-xs border rounded p-1 bg-transparent"><option value="CS 진출">CS 진출</option><option value="탈락">탈락</option></select></div>
+                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border flex justify-between items-center"><input type="text" value="${psev.csRecord || ''}" onchange="updatePsEvalHead(${sIdx}, 'csRecord', this.value)" placeholder="CS 성적" class="bg-transparent font-bold text-sm w-28"><select onchange="updatePsEvalHead(${sIdx}, 'csStatus', this.value)" class="text-xs border rounded p-1 bg-transparent"><option value="WS 진출">WS 진출</option><option value="탈락">탈락</option></select></div>
+                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border flex justify-between items-center"><input type="text" value="${psev.wsRecord || ''}" onchange="updatePsEvalHead(${sIdx}, 'wsRecord', this.value)" placeholder="WS 성적" class="bg-transparent font-bold text-sm w-28"><select onchange="updatePsEvalHead(${sIdx}, 'wsStatus', this.value)" class="text-xs border rounded p-1 bg-transparent"><option value="우승">우승</option><option value="패배">패배</option></select></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                        ${renderPsSeriesEvalBox(s, sIdx, 'dsComments', '디비전 시리즈 (DS) 평가', dsRegistered)}
+                        ${renderPsSeriesEvalBox(s, sIdx, 'csComments', '챔피언십 시리즈 (CS) 평가', csRegistered)}
+                        ${renderPsSeriesEvalBox(s, sIdx, 'wsComments', '월드 시리즈 (WS) 평가', wsRegistered)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPsSeriesEvalBox(s, sIdx, seriesEvalKey, title, registeredPlayers) {
+            let html = `<div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border space-y-4"><h3 class="font-bold text-sm">${title}</h3>`;
+            if (registeredPlayers.length === 0) html += `<p class="text-xs text-slate-400">해당 시리즈에 '등록'된 선수가 없습니다.</p>`;
+            registeredPlayers.forEach(p => {
+                let comment = s.psEval[seriesEvalKey]?.[p.name] || { title: '', body: '' };
+                let statKey = `ps_${seriesEvalKey}_${p.name}`;
+                let st = s.psEval.playerData?.[statKey] || {};
+
+                html += `
+                    <div class="p-3 bg-white dark:bg-slate-800 rounded-xl border space-y-2">
+                        <div class="font-bold text-xs">${p.name}</div>
+                        <div class="grid grid-cols-7 gap-1 text-center">
+                            <div><label class="text-[9px] text-slate-400">ERA</label><input type="text" value="${st.era || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'era', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                            <div><label class="text-[9px] text-slate-400">IP</label><input type="text" value="${st.ip || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'ip', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                            <div><label class="text-[9px] text-slate-400">K</label><input type="text" value="${st.k || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'k', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                            <div><label class="text-[9px] text-slate-400">W</label><input type="text" value="${st.win || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'win', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                            <div><label class="text-[9px] text-slate-400">L</label><input type="text" value="${st.loss || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'loss', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                            <div><label class="text-[9px] text-slate-400">H</label><input type="text" value="${st.hold || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'hold', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                            <div><label class="text-[9px] text-slate-400">SV</label><input type="text" value="${st.save || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'save', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                        </div>
+                        <input type="text" value="${comment.title || ''}" onchange="updatePsCommentTitle(${sIdx}, '${seriesEvalKey}', '${p.name}', this.value)" placeholder="평가 제목" class="w-full text-xs border rounded px-2 py-1 font-semibold bg-transparent">
+                        <button onclick="openMemoModal(${sIdx}, 'psEval', '${seriesEvalKey}', '${p.name}')" class="text-[10px] text-brand-600 underline font-semibold">전체 평가 보기</button>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            return html;
+        }
+
+        function openModal(sIdx, category, playerName, gameNum) {
+            cellCtx = { sIdx, category, playerName, gameNum };
+            const season = seasons[sIdx];
+            const gameData = season.gamesData[category]?.[playerName]?.[gameNum] || {};
+            document.getElementById('modalTitle').textContent = `[${playerName}] ${category.toUpperCase()} ${gameNum}G 상태 변경`;
+            document.getElementById('modalComment').value = gameData.comment || '';
+            const select = document.getElementById('modalStatusSelect');
+            const currentStatus = gameData.status || '';
+            if (currentStatus.includes('부상') || currentStatus.includes('시즌아웃') || currentStatus.includes('토미존')) {
+                select.value = '부상'; document.getElementById('modalInjuryType').value = currentStatus;
+            } else if (currentStatus === '마이너') { select.value = '마이너'; }
+            else if (currentStatus === '메이저') { select.value = '메이저'; }
+            else { select.value = '공백'; }
+            toggleModalInjuryOption();
+            document.getElementById('statusModal').classList.remove('hidden');
+        }
+        function toggleModalInjuryOption() { document.getElementById('modalInjuryBox').classList.toggle('hidden', document.getElementById('modalStatusSelect').value !== '부상'); }
+        function closeModal() { document.getElementById('statusModal').classList.add('hidden'); }
+
+        function saveModalStatus() {
+            const { sIdx, category, playerName, gameNum } = cellCtx;
+            if (sIdx === null) return;
+            const season = seasons[sIdx];
+            const statusType = document.getElementById('modalStatusSelect').value;
+            const comment = document.getElementById('modalComment').value.trim();
+            let finalStatus = statusType === '부상' ? document.getElementById('modalInjuryType').value : statusType;
+
+            if (!season.gamesData[category]) season.gamesData[category] = {};
+            if (!season.gamesData[category][playerName]) season.gamesData[category][playerName] = {};
+
+            if (finalStatus === '공백') delete season.gamesData[category][playerName][gameNum];
+            else season.gamesData[category][playerName][gameNum] = { status: finalStatus, comment };
+
+            closeModal(); saveStateToStorage(); refreshAppUI();
+        }
+
+        function cyclePsPlayerStatus(sIdx, seriesKey, playerName) {
+            const season = seasons[sIdx];
+            if (!season.psSeriesPlayerStatus) season.psSeriesPlayerStatus = { ds: {}, cs: {}, ws: {} };
+            if (!season.psSeriesPlayerStatus[seriesKey]) season.psSeriesPlayerStatus[seriesKey] = {};
+            let cur = season.psSeriesPlayerStatus[seriesKey][playerName] || '미등록';
+            let next = cur === '미등록' ? '등록' : (cur === '등록' ? '부상' : '미등록');
+            season.psSeriesPlayerStatus[seriesKey][playerName] = next;
+            saveStateToStorage(); refreshAppUI();
+        }
+
+        function openPsPlayerStatModal(sIdx, series, gameNum, playerName) {
+            psPlayerCtx = { sIdx, series, gameNum, playerName };
+            document.getElementById('psPlayerModalTitle').textContent = `${series.toUpperCase()} ${gameNum}차전 [${playerName}] 성적 선택`;
+            let rec = seasons[sIdx].postseasonGames?.[series]?.[gameNum] || { players: {} };
+            let pRec = rec.players?.[playerName] || { stat: '' };
+            document.getElementById('modalPlayerStatSelect').value = pRec.stat || '';
+            document.getElementById('psPlayerStatModal').classList.remove('hidden');
+        }
+        function closePsPlayerModal() { document.getElementById('psPlayerStatModal').classList.add('hidden'); }
+        function savePsPlayerStatModal() {
+            const { sIdx, series, gameNum, playerName } = psPlayerCtx; const season = seasons[sIdx];
+            if (!season.postseasonGames[series]) season.postseasonGames[series] = {};
+            if (!season.postseasonGames[series][gameNum]) season.postseasonGames[series][gameNum] = { result: '승', score: '', players: {} };
+            if (!season.postseasonGames[series][gameNum].players) season.postseasonGames[series][gameNum].players = {};
+
+            let statVal = document.getElementById('modalPlayerStatSelect').value;
+            if (statVal) {
+                if (!season.postseasonGames[series][gameNum].players[playerName]) season.postseasonGames[series][gameNum].players[playerName] = {};
+                season.postseasonGames[series][gameNum].players[playerName].stat = statVal;
+            } else {
+                if (season.postseasonGames[series][gameNum].players[playerName]) {
+                    delete season.postseasonGames[series][gameNum].players[playerName].stat;
+                }
+            }
+            closePsPlayerModal(); saveStateToStorage(); refreshAppUI(); alert('저장되었습니다.');
+        }
+
+        function triggerUpdateUpToGame(sIdx, targetGameNum) {
+            const season = seasons[sIdx]; const players = sortMatrixPlayers(getSeasonEffectiveRoster(season).filter(p => p.type !== '방출'));
+            if (!confirm(`${targetGameNum}G까지 공백 칸을 최신화하시겠습니까?`)) return;
+            const grandTimeline = getGrandMasterTimeline(); let targetIdx = grandTimeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum);
+            
+            players.forEach(p => {
+                const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name); let latestStatus = null, latestIdx = null;
+                for (let i = targetIdx; i >= 0; i--) { if (timeline[i].type === 'game' && statusMap[i]?.status && (statusMap[i].status === '메이저' || statusMap[i].status === '마이너')) { latestStatus = statusMap[i].status; latestIdx = i; break; } }
+                if (latestStatus && latestIdx !== null) {
+                    for (let i = latestIdx + 1; i <= targetIdx; i++) {
+                        let tItem = timeline[i];
+                        if (tItem.type === 'game') {
+                            if (!season.gamesData['reg']) season.gamesData['reg'] = {};
+                            if (!season.gamesData['reg'][p.name]) season.gamesData['reg'][p.name] = {};
+                            if (!season.gamesData['reg'][p.name][tItem.gNum]?.status) season.gamesData['reg'][p.name][tItem.gNum] = { status: latestStatus, comment: '최신화' };
+                        }
+                    }
+                }
+            });
+
+            if (Math.random() < 0.13) {
+                let eligibleCandidates = [];
+                players.forEach(p => {
+                    if (p.type === '절대 선수' || p.type === '현역' || p.type === '밀전드') {
+                        const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name);
+                        let curSt = statusMap[targetIdx]?.status;
+                        if (curSt === '메이저' || !curSt) {
+                            eligibleCandidates.push(p);
+                        }
+                    }
+                });
+
+                if (eligibleCandidates.length > 0) {
+                    let injuredPlayer = eligibleCandidates[Math.floor(Math.random() * eligibleCandidates.length)];
+                    let r = Math.random() * 100;
+                    let injuryType = '';
+                    let injuryLabel = '';
+                    if (r < 35) { injuryType = '부상 15일'; injuryLabel = '15일 부상'; }
+                    else if (r < 35 + 25) { injuryType = '부상 30일'; injuryLabel = '30일 부상'; }
+                    else if (r < 35 + 25 + 20) { injuryType = '부상 60일'; injuryLabel = '60일 부상'; }
+                    else if (r < 35 + 25 + 20 + 15) { injuryType = '시즌아웃'; injuryLabel = '시즌 아웃'; }
+                    else { injuryType = '토미존'; injuryLabel = '토미존 수술'; }
+
+                    if (!season.gamesData['reg']) season.gamesData['reg'] = {};
+                    if (!season.gamesData['reg'][injuredPlayer.name]) season.gamesData['reg'][injuredPlayer.name] = {};
+                    season.gamesData['reg'][injuredPlayer.name][targetGameNum] = { status: injuryType, comment: '자동 부상 발생' };
+
+                    alert(`[${injuredPlayer.name}(${injuredPlayer.position})] 선수가 ${injuryLabel}의 부상을 당했습니다.`);
+                }
+            }
+
+            saveStateToStorage(); refreshAppUI(); alert('최신화 완료');
+        }
+
+        function openMemoModal(sIdx, evalType, rangeType, playerName) {
+            memoCtx = { sIdx, evalType, rangeType, playerName };
+            const season = seasons[sIdx]; let content = '';
+            if (evalType === 'seasonEval') content = season.seasonEval[rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments']?.[playerName]?.body || '';
+            else if (evalType === 'psEval') content = season.psEval[rangeType]?.[playerName]?.body || '';
+            document.getElementById('memoModalTitle').textContent = `[${playerName}] 전체 평가 메모장`;
+            document.getElementById('memoModalTextarea').value = content;
+            document.getElementById('memoModal').classList.remove('hidden');
+        }
+        function closeMemoModal() { document.getElementById('memoModal').classList.add('hidden'); }
+        function saveMemoModal() {
+            const { sIdx, evalType, rangeType, playerName } = memoCtx; const season = seasons[sIdx];
+            let bodyText = document.getElementById('memoModalTextarea',).value;
+            if (evalType === 'seasonEval') {
+                let key = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments';
+                if (!season.seasonEval[key][playerName]) season.seasonEval[key][playerName] = { title: '', body: '' };
+                season.seasonEval[key][playerName].body = bodyText;
+            } else if (evalType === 'psEval') {
+                if (!season.psEval[rangeType][playerName]) season.psEval[rangeType][playerName] = { title: '', body: '' };
+                season.psEval[rangeType][playerName].body = bodyText;
+            }
+            closeMemoModal(); saveStateToStorage(); refreshAppUI(); alert('평가 본문이 저장되었습니다.');
+        }
+
+        function updateTeamEval(sIdx, field, val) { seasons[sIdx].seasonEval[field] = val; saveStateToStorage(); }
+        function updatePlayerStat(sIdx, statKey, field, val) { if (!seasons[sIdx].seasonEval.playerData[statKey]) seasons[sIdx].seasonEval.playerData[statKey] = {}; seasons[sIdx].seasonEval.playerData[statKey][field] = val; saveStateToStorage(); }
+        function updateCommentTitle(sIdx, rangeType, playerName, val) { let key = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments'; if (!seasons[sIdx].seasonEval[key][playerName]) seasons[sIdx].seasonEval[key][playerName] = { title: '', body: '' }; seasons[sIdx].seasonEval[key][playerName].title = val; saveStateToStorage(); }
+        function updatePsEvalHead(sIdx, field, val) { seasons[sIdx].psEval[field] = val; saveStateToStorage(); }
+        function updatePsStat(sIdx, statKey, field, val) { if (!seasons[sIdx].psEval.playerData[statKey]) seasons[sIdx].psEval.playerData[statKey] = {}; seasons[sIdx].psEval.playerData[statKey][field] = val; saveStateToStorage(); }
+        function updatePsCommentTitle(sIdx, seriesEvalKey, playerName, val) { if (!seasons[sIdx].psEval[seriesEvalKey][playerName]) seasons[sIdx].psEval[seriesEvalKey][playerName] = { title: '', body: '' }; seasons[sIdx].psEval[seriesEvalKey][playerName].title = val; saveStateToStorage(); }
+    </script>
+</body>
+</html>
