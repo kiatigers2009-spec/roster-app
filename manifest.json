@@ -4,9 +4,10 @@
   "display": "standalone",
   "name": "로스터 관리",
   "orientation": "any",
-  "scope": "/",
+  "scope": "./",
   "short_name": "로스터 관리",
-  "start_url": "/",
+  "start_url": "./index.html",
   "theme_color": "#ffffff",
   "description": "프로야구 피칭 로스터 관리 및 시즌 현황 관리를 위함"
 }
+```[cite: 5, 6]
