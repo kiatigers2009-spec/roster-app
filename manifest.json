@@ -8,6 +8,17 @@
   "short_name": "로스터 관리",
   "start_url": "./index.html",
   "theme_color": "#ffffff",
-  "description": "프로야구 피칭 로스터 관리 및 시즌 현황 관리를 위함"
+  "description": "프로야구 피칭 로스터 관리 및 시즌 현황 관리를 위함",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
-
