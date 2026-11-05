@@ -881,6 +881,25 @@
             return { timeline, statusMap };
         }
 
+        // 마이너 강등 횟수(옵션 사용 횟수) 계산 함수
+        function getMinorStintsCount(season, playerName) {
+            const { timeline, statusMap } = computePlayerTimelineStatus(season, playerName);
+            let stintsCount = 0;
+            let prevStatus = null;
+
+            for (let i = 0; i < timeline.length; i++) {
+                let t = timeline[i];
+                if (t.type !== 'game') continue;
+                let st = statusMap[i]?.status || null;
+
+                if (st === '마이너' && prevStatus !== '마이너') {
+                    stintsCount++;
+                }
+                prevStatus = st;
+            }
+            return stintsCount;
+        }
+
         function getPlayerCarryoverStatus(season, playerName) {
             const { timeline, statusMap } = computePlayerTimelineStatus(season, playerName);
             let activeStatus = null;
@@ -991,13 +1010,16 @@
                 else if (latestActiveStatus === '마이너') dotColorClass = 'bg-amber-500';
                 else if (latestActiveStatus && (latestActiveStatus.includes('부상') || latestActiveStatus === '시즌아웃' || latestActiveStatus === '토미존')) dotColorClass = 'bg-rose-500';
 
+                // 마이너 옵션 횟수 계산 (N/5)
+                const minorStints = getMinorStintsCount(season, p.name);
+
                 tr.innerHTML = `
                     <td class="p-2 text-left sticky-col bg-white dark:bg-slate-800 shadow-sm border-r">
                         <div class="flex items-center space-x-1.5">
                             <span class="inline-block w-2.5 h-2.5 rounded-full ${dotColorClass}" title="현재 상태: ${latestActiveStatus || '미등록'}"></span>
                             <div class="font-bold truncate max-w-[85px]">${p.name}</div>
                         </div>
-                        <div class="text-[9px] text-slate-400 pl-4">${p.position} (${p.hand})</div>
+                        <div class="text-[9px] text-slate-400 pl-4">${p.position} (${p.hand}) [${minorStints}/5]</div>
                     </td>
                 `;
 
@@ -1010,7 +1032,7 @@
                         let comment = gameData?.comment || '';
                         if (comment && comment.trim() !== '' && comment !== '최신화' && comment !== '자동 부상 발생') {
                             td.classList.add('has-comment');
-                            td.title = ` ${comment}`;
+                            td.title = `${comment}`;
                         }
                     }
 
@@ -1072,6 +1094,7 @@
             `;
             players.forEach(p => {
                 const stats = computePlayerStatsSummary(s, p.name, rangeType);
+                const minorStints = getMinorStintsCount(s, p.name);
                 const commentData = s.seasonEval[rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments']?.[p.name] || { title: '', body: '' };
                 const statKey = `${rangeType}_${p.name}`;
                 const userStats = s.seasonEval.playerData?.[statKey] || {};
@@ -1079,7 +1102,7 @@
                 html += `
                     <tr>
                         <td class="p-2.5 font-bold">${p.name}<br><span class="text-[9px] text-slate-400">${p.position} (${p.hand})</span></td>
-                        <td class="p-2.5 whitespace-nowrap"><span class="text-blue-600 font-semibold">메이저: ${stats.majorDays}일</span><br><span class="text-amber-600 font-semibold">마이너: ${stats.minorDays}일</span><br><span class="text-rose-600 font-semibold">부상: ${stats.injuryDays}일</span></td>
+                        <td class="p-2.5 whitespace-nowrap"><span class="text-blue-600 font-semibold">메이저: ${stats.majorDays}일</span><br><span class="text-amber-600 font-semibold">마이너: ${stats.minorDays}일 [${minorStints}/5]</span><br><span class="text-rose-600 font-semibold">부상: ${stats.injuryDays}일</span></td>
                         <td class="p-2.5 text-center"><input type="text" value="${userStats.era || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'era', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
                         <td class="p-2.5 text-center"><input type="text" value="${userStats.ip || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'ip', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
                         <td class="p-2.5 text-center"><input type="text" value="${userStats.k || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'k', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
@@ -1437,7 +1460,7 @@
         function updateCommentTitle(sIdx, rangeType, playerName, val) { let key = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments'; if (!seasons[sIdx].seasonEval[key][playerName]) seasons[sIdx].seasonEval[key][playerName] = { title: '', body: '' }; seasons[sIdx].seasonEval[key][playerName].title = val; saveStateToStorage(); }
         function updatePsEvalHead(sIdx, field, val) { seasons[sIdx].psEval[field] = val; saveStateToStorage(); }
         function updatePsStat(sIdx, statKey, field, val) { if (!seasons[sIdx].psEval.playerData[statKey]) seasons[sIdx].psEval.playerData[statKey] = {}; seasons[sIdx].psEval.playerData[statKey][field] = val; saveStateToStorage(); }
-        function updatePsCommentTitle(sIdx, seriesEvalKey, playerName, val) { if (!seasons[sIdx].psEval[seriesEvalKey][playerName]) seasons[sIdx].psEval[seriesEvalKey][playerName] = { title: '', body: '' }; seasons[sIdx].psEval[seriesEvalKey][playerName].title = val; saveStateToStorage(); }
+        function updatePsCommentTitle(sIdx, seriesEvalKey, playerName, val) { if (!seasons[sIdx].psEval[seriesEvalKey][playerName]) seasons[sIdx].psEval[seriesEvalKey][playerName] = { title: '', body: '' }; seasons[sIdx].psEval[seriesEvalKey][playerName].title = val; saveStateToStatus(); }
     </script>
 </body>
 </html>
