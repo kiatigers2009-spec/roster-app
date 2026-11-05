@@ -1341,7 +1341,7 @@
                         if (tItem.type === 'game') {
                             if (!season.gamesData['reg']) season.gamesData['reg'] = {};
                             if (!season.gamesData['reg'][p.name]) season.gamesData['reg'][p.name] = {};
-                            if (!season.gamesData['reg'][p.name][tItem.gNum]?.status) season.gamesData['reg'][p.name][tItem.gNum] = { status: latestStatus, comment: '최신화' };
+                            if (!season.gamesData['reg'][p.name][tItem.gNum]?.status) season.gamesData['reg'][p.name][tItem.gNum] = { status: latestStatus, comment: '' };
                         }
                     }
                 }
