@@ -63,6 +63,23 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .sticky-col { position: sticky; left: 0; z-index: 10; }
+
+        /* 구글 시트 스타일 우측 상단 노란색 메모 표식 스타일 */
+        .has-comment {
+            position: relative !important;
+        }
+        .has-comment::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-top: 6px solid #eab308; /* Tailwind amber-500 색상 */
+            border-left: 6px solid transparent;
+            pointer-events: none;
+            z-index: 5;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col md:flex-row">
@@ -614,7 +631,6 @@
             const active = globalPlayers.filter(p => p.type !== '방출');
             document.getElementById('globalPlayerCount').textContent = `총 ${active.length}명`;
             active.forEach(p => {
-                // 모바일에서 이름 칸이 잘 보이도록 고정 너비(min-w-[120px] 등) 적용
                 tbody.innerHTML += `
                     <tr id="player-row-${p.id}" class="hover:bg-slate-50 dark:hover:bg-slate-700/50 border-b">
                         <td class="px-3 py-2.5 min-w-[130px]"><input type="text" value="${p.name}" class="edit-name w-full border rounded px-2 py-1.5 text-xs font-bold bg-transparent"></td>
@@ -987,9 +1003,20 @@
 
                 timeline.forEach((item, idx) => {
                     const td = document.createElement('td'); const activeInfo = statusMap[idx];
+                    
+                    // 사용자 입력 코멘트 존재 여부 판별 (구글시트 형태 표식 적용)
+                    if (item.type === 'game') {
+                        let gameData = season.gamesData?.['reg']?.[p.name]?.[item.gNum];
+                        let comment = gameData?.comment || '';
+                        if (comment && comment.trim() !== '' && comment !== '최신화' && comment !== '자동 부상 발생') {
+                            td.classList.add('has-comment');
+                            td.title = `코멘트: ${comment}`;
+                        }
+                    }
+
                     if (item.type === 'allstar') { td.className = "p-1 border-l bg-amber-50/50 dark:bg-amber-950/40 text-center text-[8px] font-bold text-amber-600"; td.textContent = 'ASB'; }
                     else {
-                        td.className = "p-1 border-l hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-center";
+                        td.className = "p-1 border-l hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-center " + (td.className || '');
                         if (activeInfo && activeInfo.status) {
                             let st = activeInfo.status;
                             let badgeLabel = st;
