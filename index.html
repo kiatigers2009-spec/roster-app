@@ -843,14 +843,15 @@
                     let curIdx = i;
                     while (curIdx < timeline.length && filled < duration) {
                         let curT = timeline[curIdx];
+                        let dispSt = st;
+                        let dispCom = '';
+
                         if (curT.type === 'allstar') {
-                            statusMap[curIdx] = { status: st, comment: '올스타 브레이크 소모' };
-                            curIdx++;
-                            continue;
+                            dispCom = '올스타 브레이크 기간 차감';
+                        } else {
+                            dispCom = (filled === 0) ? comment : (st === '마이너' ? '최소 등록 기간' : '기간 자동 연장');
                         }
 
-                        let dispSt = st;
-                        let dispCom = (filled === 0) ? comment : (st === '마이너' ? '최소 등록 기간' : '기간 자동 연장');
                         statusMap[curIdx] = { status: dispSt, comment: dispCom };
                         filled++;
                         curIdx++;
@@ -1392,7 +1393,7 @@
         function closeMemoModal() { document.getElementById('memoModal').classList.add('hidden'); }
         function saveMemoModal() {
             const { sIdx, evalType, rangeType, playerName } = memoCtx; const season = seasons[sIdx];
-            let bodyText = document.getElementById('memoModalTextarea',).value;
+            let bodyText = document.getElementById('memoModalTextarea').value;
             if (evalType === 'seasonEval') {
                 let key = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments';
                 if (!season.seasonEval[key][playerName]) season.seasonEval[key][playerName] = { title: '', body: '' };
