@@ -75,7 +75,7 @@
             right: 0;
             width: 0;
             height: 0;
-            border-top: 6px solid #eab308; /* Tailwind amber-500 색상 */
+            border-top: 6px solid #eab308;
             border-left: 6px solid transparent;
             pointer-events: none;
             z-index: 5;
@@ -229,7 +229,6 @@
                         <h3 class="font-bold text-sm sm:text-base">전체 등록 선수 명단</h3>
                         <span id="globalPlayerCount" class="text-xs font-bold px-2.5 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg">총 0명</span>
                     </div>
-                    <!-- 모바일 가독성을 위해 가로 스크롤(overflow-x-auto) 및 테이블 최소 너비 부여 -->
                     <div class="overflow-x-auto custom-scrollbar">
                         <table class="w-full min-w-[550px] text-sm text-left">
                             <tbody id="globalPlayerTableBody" class="divide-y"></tbody>
@@ -859,15 +858,14 @@
                     let curIdx = i;
                     while (curIdx < timeline.length && filled < duration) {
                         let curT = timeline[curIdx];
-                        let dispSt = st;
-                        let dispCom = '';
-
                         if (curT.type === 'allstar') {
-                            dispCom = '올스타 브레이크 기간 차감';
-                        } else {
-                            dispCom = (filled === 0) ? comment : (st === '마이너' ? '최소 등록 기간' : '기간 자동 연장');
+                            statusMap[curIdx] = { status: st, comment: '올스타 브레이크 소모' };
+                            curIdx++;
+                            continue;
                         }
 
+                        let dispSt = st;
+                        let dispCom = (filled === 0) ? comment : (st === '마이너' ? '최소 등록 기간' : '기간 자동 연장');
                         statusMap[curIdx] = { status: dispSt, comment: dispCom };
                         filled++;
                         curIdx++;
@@ -879,25 +877,6 @@
                 }
             }
             return { timeline, statusMap };
-        }
-
-        // 마이너 강등 횟수(옵션 사용 횟수) 계산 함수
-        function getMinorStintsCount(season, playerName) {
-            const { timeline, statusMap } = computePlayerTimelineStatus(season, playerName);
-            let stintsCount = 0;
-            let prevStatus = null;
-
-            for (let i = 0; i < timeline.length; i++) {
-                let t = timeline[i];
-                if (t.type !== 'game') continue;
-                let st = statusMap[i]?.status || null;
-
-                if (st === '마이너' && prevStatus !== '마이너') {
-                    stintsCount++;
-                }
-                prevStatus = st;
-            }
-            return stintsCount;
         }
 
         function getPlayerCarryoverStatus(season, playerName) {
@@ -1010,23 +989,20 @@
                 else if (latestActiveStatus === '마이너') dotColorClass = 'bg-amber-500';
                 else if (latestActiveStatus && (latestActiveStatus.includes('부상') || latestActiveStatus === '시즌아웃' || latestActiveStatus === '토미존')) dotColorClass = 'bg-rose-500';
 
-                // 마이너 옵션 횟수 계산 (N/5)
-                const minorStints = getMinorStintsCount(season, p.name);
-
                 tr.innerHTML = `
                     <td class="p-2 text-left sticky-col bg-white dark:bg-slate-800 shadow-sm border-r">
                         <div class="flex items-center space-x-1.5">
                             <span class="inline-block w-2.5 h-2.5 rounded-full ${dotColorClass}" title="현재 상태: ${latestActiveStatus || '미등록'}"></span>
                             <div class="font-bold truncate max-w-[85px]">${p.name}</div>
                         </div>
-                        <div class="text-[9px] text-slate-400 pl-4">${p.position} (${p.hand}) [${minorStints}/5]</div>
+                        <div class="text-[9px] text-slate-400 pl-4">${p.position} (${p.hand})</div>
                     </td>
                 `;
 
                 timeline.forEach((item, idx) => {
                     const td = document.createElement('td'); const activeInfo = statusMap[idx];
                     
-                    // 사용자 입력 코멘트 존재 여부 판별 (구글시트 형태 표식 적용)
+                    // 구글 시트 형태 우측 상단 노란색 메모 표식 처리
                     if (item.type === 'game') {
                         let gameData = season.gamesData?.['reg']?.[p.name]?.[item.gNum];
                         let comment = gameData?.comment || '';
@@ -1094,7 +1070,6 @@
             `;
             players.forEach(p => {
                 const stats = computePlayerStatsSummary(s, p.name, rangeType);
-                const minorStints = getMinorStintsCount(s, p.name);
                 const commentData = s.seasonEval[rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments']?.[p.name] || { title: '', body: '' };
                 const statKey = `${rangeType}_${p.name}`;
                 const userStats = s.seasonEval.playerData?.[statKey] || {};
@@ -1102,7 +1077,7 @@
                 html += `
                     <tr>
                         <td class="p-2.5 font-bold">${p.name}<br><span class="text-[9px] text-slate-400">${p.position} (${p.hand})</span></td>
-                        <td class="p-2.5 whitespace-nowrap"><span class="text-blue-600 font-semibold">메이저: ${stats.majorDays}일</span><br><span class="text-amber-600 font-semibold">마이너: ${stats.minorDays}일 [${minorStints}/5]</span><br><span class="text-rose-600 font-semibold">부상: ${stats.injuryDays}일</span></td>
+                        <td class="p-2.5 whitespace-nowrap"><span class="text-blue-600 font-semibold">메이저: ${stats.majorDays}일</span><br><span class="text-amber-600 font-semibold">마이너: ${stats.minorDays}일</span><br><span class="text-rose-600 font-semibold">부상: ${stats.injuryDays}일</span></td>
                         <td class="p-2.5 text-center"><input type="text" value="${userStats.era || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'era', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
                         <td class="p-2.5 text-center"><input type="text" value="${userStats.ip || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'ip', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
                         <td class="p-2.5 text-center"><input type="text" value="${userStats.k || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'k', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
@@ -1377,6 +1352,7 @@
             closePsPlayerModal(); saveStateToStorage(); refreshAppUI(); alert('저장되었습니다.');
         }
 
+        // 🌟 수정된 핵심 최신화 함수 (이전 버전의 안정적인 연장 로직 복원 + 메모/올스타 유지)
         function triggerUpdateUpToGame(sIdx, targetGameNum) {
             const season = seasons[sIdx]; 
             const players = sortMatrixPlayers(getSeasonEffectiveRoster(season).filter(p => p.type !== '방출'));
@@ -1386,15 +1362,14 @@
             let targetIdx = grandTimeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum);
             
             players.forEach(p => {
-                // 현재 타임라인 상태 계산
                 const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name); 
                 
-                // G1부터 targetIdx까지 순회하며 공백 칸을 직전 상태로 채움
                 for (let i = 0; i <= targetIdx; i++) {
                     let tItem = timeline[i];
                     if (tItem.type === 'game') {
                         let hasExplicitData = season.gamesData?.['reg']?.[p.name]?.[tItem.gNum]?.status;
                         
+                        // 이미 데이터가 입력되어 있지 않은 빈 칸인 경우에만 직전 상태를 이어받음
                         if (!hasExplicitData && !statusMap[i]?.status) {
                             let prevStatus = null;
                             if (i > 0) {
@@ -1405,13 +1380,13 @@
                                 }
                             }
                             
-                            // 직전 상태가 마이너 또는 메이저인 경우에만 한 경기씩 연장
+                            // 직전 상태가 마이너이거나 메이저일 때, 10경기 의무 기간이 끝나도 끊기지 않고 1경기씩 계속 마이너 연장됨
                             if (prevStatus === '마이너' || prevStatus === '메이저') {
                                 if (!season.gamesData['reg']) season.gamesData['reg'] = {};
                                 if (!season.gamesData['reg'][p.name]) season.gamesData['reg'][p.name] = {};
                                 
-                                season.gamesData['reg'][p.name][tItem.gNum] = { status: prevStatus, comment: '' };
-                                statusMap[i] = { status: prevStatus, comment: '' };
+                                season.gamesData['reg'][p.name][tItem.gNum] = { status: prevStatus, comment: '최신화' };
+                                statusMap[i] = { status: prevStatus, comment: '최신화' };
                             }
                         }
                     }
@@ -1433,8 +1408,7 @@
                 if (eligibleCandidates.length > 0) {
                     let injuredPlayer = eligibleCandidates[Math.floor(Math.random() * eligibleCandidates.length)];
                     let r = Math.random() * 100;
-                    let injuryType = '';
-                    let injuryLabel = '';
+                    let injuryType = '', injuryLabel = '';
                     if (r < 35) { injuryType = '부상 15일'; injuryLabel = '15일 부상'; }
                     else if (r < 35 + 25) { injuryType = '부상 30일'; injuryLabel = '30일 부상'; }
                     else if (r < 35 + 25 + 20) { injuryType = '부상 60일'; injuryLabel = '60일 부상'; }
@@ -1481,7 +1455,7 @@
         function updateCommentTitle(sIdx, rangeType, playerName, val) { let key = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments'; if (!seasons[sIdx].seasonEval[key][playerName]) seasons[sIdx].seasonEval[key][playerName] = { title: '', body: '' }; seasons[sIdx].seasonEval[key][playerName].title = val; saveStateToStorage(); }
         function updatePsEvalHead(sIdx, field, val) { seasons[sIdx].psEval[field] = val; saveStateToStorage(); }
         function updatePsStat(sIdx, statKey, field, val) { if (!seasons[sIdx].psEval.playerData[statKey]) seasons[sIdx].psEval.playerData[statKey] = {}; seasons[sIdx].psEval.playerData[statKey][field] = val; saveStateToStorage(); }
-        function updatePsCommentTitle(sIdx, seriesEvalKey, playerName, val) { if (!seasons[sIdx].psEval[seriesEvalKey][playerName]) seasons[sIdx].psEval[seriesEvalKey][playerName] = { title: '', body: '' }; seasons[sIdx].psEval[seriesEvalKey][playerName].title = val; saveStateToStatus(); }
+        function updatePsCommentTitle(sIdx, seriesEvalKey, playerName, val) { if (!s.psEval[seriesEvalKey][playerName]) seasons[sIdx].psEval[seriesEvalKey][playerName] = { title: '', body: '' }; seasons[sIdx].psEval[seriesEvalKey][playerName].title = val; saveStateToStorage(); }
     </script>
 </body>
 </html>
