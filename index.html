@@ -1378,20 +1378,41 @@
         }
 
         function triggerUpdateUpToGame(sIdx, targetGameNum) {
-            const season = seasons[sIdx]; const players = sortMatrixPlayers(getSeasonEffectiveRoster(season).filter(p => p.type !== '방출'));
+            const season = seasons[sIdx]; 
+            const players = sortMatrixPlayers(getSeasonEffectiveRoster(season).filter(p => p.type !== '방출'));
             if (!confirm(`${targetGameNum}G까지 공백 칸을 최신화하시겠습니까?`)) return;
-            const grandTimeline = getGrandMasterTimeline(); let targetIdx = grandTimeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum);
+            
+            const grandTimeline = getGrandMasterTimeline(); 
+            let targetIdx = grandTimeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum);
             
             players.forEach(p => {
-                const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name); let latestStatus = null, latestIdx = null;
-                for (let i = targetIdx; i >= 0; i--) { if (timeline[i].type === 'game' && statusMap[i]?.status && (statusMap[i].status === '메이저' || statusMap[i].status === '마이너')) { latestStatus = statusMap[i].status; latestIdx = i; break; } }
-                if (latestStatus && latestIdx !== null) {
-                    for (let i = latestIdx + 1; i <= targetIdx; i++) {
-                        let tItem = timeline[i];
-                        if (tItem.type === 'game') {
-                            if (!season.gamesData['reg']) season.gamesData['reg'] = {};
-                            if (!season.gamesData['reg'][p.name]) season.gamesData['reg'][p.name] = {};
-                            if (!season.gamesData['reg'][p.name][tItem.gNum]?.status) season.gamesData['reg'][p.name][tItem.gNum] = { status: latestStatus, comment: '' };
+                // 현재 타임라인 상태 계산
+                const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name); 
+                
+                // G1부터 targetIdx까지 순회하며 공백 칸을 직전 상태로 채움
+                for (let i = 0; i <= targetIdx; i++) {
+                    let tItem = timeline[i];
+                    if (tItem.type === 'game') {
+                        let hasExplicitData = season.gamesData?.['reg']?.[p.name]?.[tItem.gNum]?.status;
+                        
+                        if (!hasExplicitData && !statusMap[i]?.status) {
+                            let prevStatus = null;
+                            if (i > 0) {
+                                let prevTItem = timeline[i - 1];
+                                if (prevTItem.type === 'game') {
+                                    let prevExplicit = season.gamesData?.['reg']?.[p.name]?.[prevTItem.gNum]?.status;
+                                    prevStatus = prevExplicit || statusMap[i - 1]?.status;
+                                }
+                            }
+                            
+                            // 직전 상태가 마이너 또는 메이저인 경우에만 한 경기씩 연장
+                            if (prevStatus === '마이너' || prevStatus === '메이저') {
+                                if (!season.gamesData['reg']) season.gamesData['reg'] = {};
+                                if (!season.gamesData['reg'][p.name]) season.gamesData['reg'][p.name] = {};
+                                
+                                season.gamesData['reg'][p.name][tItem.gNum] = { status: prevStatus, comment: '' };
+                                statusMap[i] = { status: prevStatus, comment: '' };
+                            }
                         }
                     }
                 }
