@@ -344,6 +344,33 @@
         </div>
     </div>
 
+    <!-- 콜업/강등 관리 모달 추가 -->
+    <div id="callupDemoteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-xl border">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-base">선수 콜업 / 강등 관리</h3>
+                <button onclick="closeCallupDemoteModal()" class="text-slate-400 text-lg font-bold">×</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <h4 class="font-bold text-xs text-rose-600 uppercase tracking-wider">강등할 선수 (현재 메이저)</h4>
+                    <div id="demoteCandidateList" class="border rounded-xl p-3 max-h-60 overflow-y-auto space-y-1 bg-slate-50 dark:bg-slate-900 text-xs"></div>
+                </div>
+                <div class="space-y-2">
+                    <h4 class="font-bold text-xs text-blue-600 uppercase tracking-wider">콜업할 선수 (마이너 10G 만료)</h4>
+                    <div id="callupCandidateList" class="border rounded-xl p-3 max-h-60 overflow-y-auto space-y-1 bg-slate-50 dark:bg-slate-900 text-xs"></div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t">
+                <span id="callupDemoteInfoText" class="text-[11px] text-slate-400 font-medium">기준 시점: -</span>
+                <div class="space-x-2">
+                    <button onclick="closeCallupDemoteModal()" class="px-4 py-2 text-xs bg-slate-100 dark:bg-slate-700 rounded-xl font-semibold">취소</button>
+                    <button onclick="executeCallupDemote()" class="px-4 py-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-sm">전환</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 포스트시즌 선수별 승/패/홀드/세이브/등판/블론 간편 선택 모달 -->
     <div id="psPlayerStatModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-xl border">
@@ -446,6 +473,7 @@
         let cellCtx = { sIdx: null, category: null, playerName: null, gameNum: null };
         let psPlayerCtx = { sIdx: null, series: null, gameNum: null, playerName: null };
         let memoCtx = { sIdx: null, evalType: null, rangeType: null, playerName: null };
+        let callupDemoteCtx = { sIdx: null }; // 콜업/강등 모달용 맥락
 
         // ==================== 파이어베이스 클라우드 연동 함수 ====================
         async function loadDataFromCloud() {
@@ -816,6 +844,24 @@
             return timeline;
         }
 
+        function getPlayerMinorRegistrationCount(season, playerName) {
+            const { timeline, statusMap } = computePlayerTimelineStatus(season, playerName);
+            let count = 0;
+            let prevStatus = null;
+
+            for (let i = 0; i < timeline.length; i++) {
+                let t = timeline[i];
+                if (t.type === 'game') {
+                    let curStatus = statusMap[i]?.status || null;
+                    if (curStatus === '마이너' && prevStatus !== '마이너') {
+                        count++;
+                    }
+                    prevStatus = curStatus;
+                }
+            }
+            return count;
+        }
+
         function computePlayerTimelineStatus(season, playerName) {
             const timeline = getGrandMasterTimeline();
             let statusMap = new Array(timeline.length).fill(null);
@@ -860,6 +906,7 @@
                         let curT = timeline[curIdx];
                         if (curT.type === 'allstar') {
                             statusMap[curIdx] = { status: st, comment: '올스타 브레이크 소모' };
+                            filled++;
                             curIdx++;
                             continue;
                         }
@@ -933,7 +980,10 @@
                 regDiv.innerHTML = `
                     <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <div><h2 class="text-base sm:text-lg font-bold">📅 ${s.name} 정규 시즌 현황</h2><p class="text-xs text-slate-500">정규시즌(160G)</p></div>
-                        <button onclick="saveSeasonRosterSnapshot(${sIdx})" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold py-2 px-3.5 rounded-xl shadow-sm">시즌 로스터 저장 (고정)</button>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="openCallupDemoteModal(${sIdx})" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-3.5 rounded-xl shadow-sm">콜업/강등</button>
+                            <button onclick="saveSeasonRosterSnapshot(${sIdx})" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold py-2 px-3.5 rounded-xl shadow-sm">시즌 로스터 저장 (고정)</button>
+                        </div>
                     </div>
                     <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden">
                         <div class="overflow-x-auto custom-scrollbar max-h-[550px]">
@@ -989,20 +1039,24 @@
                 else if (latestActiveStatus === '마이너') dotColorClass = 'bg-amber-500';
                 else if (latestActiveStatus && (latestActiveStatus.includes('부상') || latestActiveStatus === '시즌아웃' || latestActiveStatus === '토미존')) dotColorClass = 'bg-rose-500';
 
+                let minorCount = getPlayerMinorRegistrationCount(season, p.name);
+
                 tr.innerHTML = `
                     <td class="p-2 text-left sticky-col bg-white dark:bg-slate-800 shadow-sm border-r">
                         <div class="flex items-center space-x-1.5">
                             <span class="inline-block w-2.5 h-2.5 rounded-full ${dotColorClass}" title="현재 상태: ${latestActiveStatus || '미등록'}"></span>
                             <div class="font-bold truncate max-w-[85px]">${p.name}</div>
                         </div>
-                        <div class="text-[9px] text-slate-400 pl-4">${p.position} (${p.hand})</div>
+                        <div class="text-[9px] text-slate-400 pl-4 flex justify-between items-center">
+                            <span>${p.position} (${p.hand})</span>
+                            <span>[${minorCount}/5]</span>
+                        </div>
                     </td>
                 `;
 
                 timeline.forEach((item, idx) => {
                     const td = document.createElement('td'); const activeInfo = statusMap[idx];
                     
-                    // 구글 시트 형태 우측 상단 노란색 메모 표식 처리
                     if (item.type === 'game') {
                         let gameData = season.gamesData?.['reg']?.[p.name]?.[item.gNum];
                         let comment = gameData?.comment || '';
@@ -1037,6 +1091,117 @@
                 tbody.appendChild(tr);
             });
         }
+
+        // ==================== 콜업 / 강등 모달 로직 ====================
+        function getLastUpdatedGameNum(season) {
+            let maxG = 1;
+            if (season.gamesData && season.gamesData['reg']) {
+                Object.keys(season.gamesData['reg']).forEach(playerName => {
+                    Object.keys(season.gamesData['reg'][playerName]).forEach(gStr => {
+                        let g = parseInt(gStr);
+                        if (g > maxG) maxG = g;
+                    });
+                });
+            }
+            return maxG;
+        }
+
+        function openCallupDemoteModal(sIdx) {
+            callupDemoteCtx = { sIdx };
+            const season = seasons[sIdx];
+            const lastG = getLastUpdatedGameNum(season);
+            const nextG = lastG < 160 ? lastG + 1 : 160;
+
+            document.getElementById('callupDemoteInfoText').textContent = `기준 최신화 시점: ${lastG}G (적용일: ${nextG}G)`;
+
+            const players = sortMatrixPlayers(getSeasonEffectiveRoster(season).filter(p => p.type !== '방출'));
+            
+            let demoteListEl = document.getElementById('demoteCandidateList');
+            let callupListEl = document.getElementById('callupCandidateList');
+            demoteListEl.innerHTML = '';
+            callupListEl.innerHTML = '';
+
+            let demoteCount = 0;
+            let callupCount = 0;
+
+            players.forEach(p => {
+                const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name);
+                let lastIdx = timeline.findIndex(t => t.type === 'game' && t.gNum === lastG);
+                let nextIdx = timeline.findIndex(t => t.type === 'game' && t.gNum === nextG);
+
+                if (lastIdx !== -1 && nextIdx !== -1) {
+                    let lastSt = statusMap[lastIdx]?.status;
+                    let nextSt = statusMap[nextIdx]?.status;
+
+                    // 1. 강등 후보: 마지막 최신화 시점에서 '메이저'
+                    if (lastSt === '메이저') {
+                        demoteCount++;
+                        demoteListEl.innerHTML += `
+                            <label class="flex items-center space-x-2 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer">
+                                <input type="radio" name="demotePlayer" value="${p.name}" class="text-brand-600">
+                                <span class="font-bold">${p.name}</span>
+                                <span class="text-slate-400">(${p.position}, #${p.backNum})</span>
+                            </label>
+                        `;
+                    }
+
+                    // 2. 콜업 후보: 마지막 최신화 시점에서 '마이너'이면서 다음날이 비어있는 경우
+                    if (lastSt === '마이너' && !nextSt) {
+                        callupCount++;
+                        callupListEl.innerHTML += `
+                            <label class="flex items-center space-x-2 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer">
+                                <input type="radio" name="callupPlayer" value="${p.name}" class="text-brand-600">
+                                <span class="font-bold">${p.name}</span>
+                                <span class="text-slate-400">(${p.position}, #${p.backNum})</span>
+                            </label>
+                        `;
+                    }
+                }
+            });
+
+            if (demoteCount === 0) demoteListEl.innerHTML = `<p class="text-slate-400 p-2">강등 가능한 메이저 선수가 없습니다.</p>`;
+            if (callupCount === 0) callupListEl.innerHTML = `<p class="text-slate-400 p-2">콜업 가능한 마이너 선수가 없습니다.</p>`;
+
+            document.getElementById('callupDemoteModal').classList.remove('hidden');
+        }
+
+        function closeCallupDemoteModal() {
+            document.getElementById('callupDemoteModal').classList.add('hidden');
+        }
+
+        function executeCallupDemote() {
+            const { sIdx } = callupDemoteCtx;
+            if (sIdx === null) return;
+            const season = seasons[sIdx];
+            const lastG = getLastUpdatedGameNum(season);
+            const targetG = lastG < 160 ? lastG + 1 : 160;
+
+            const demoteRadio = document.querySelector('input[name="demotePlayer"]:checked');
+            const callupRadio = document.querySelector('input[name="callupPlayer"]:checked');
+
+            if (!demoteRadio || !callupRadio) {
+                return alert('강등할 선수와 콜업할 선수를 각각 1명씩 선택해주세요.');
+            }
+
+            const demoteName = demoteRadio.value;
+            const callupName = callupRadio.value;
+
+            if (!season.gamesData['reg']) season.gamesData['reg'] = {};
+            
+            // 강등 선수 처리 ('마이너' 등록 및 최소 등록 기간 10G 적용)
+            if (!season.gamesData['reg'][demoteName]) season.gamesData['reg'][demoteName] = {};
+            season.gamesData['reg'][demoteName][targetG] = { status: '마이너', comment: '콜업/강등 전환' };
+
+            // 콜업 선수 처리 ('메이저' 등록)
+            if (!season.gamesData['reg'][callupName]) season.gamesData['reg'][callupName] = {};
+            season.gamesData['reg'][callupName][targetG] = { status: '메이저', comment: '콜업/강등 전환' };
+
+            closeCallupDemoteModal();
+            saveStateToStorage();
+            refreshAppUI();
+            alert(`[${targetG}G 적용] ${demoteName} 선수가 강등(마이너)되었고, ${callupName} 선수가 콜업(메이저)되었습니다.`);
+        }
+        // ==============================================================
 
         function renderSeasonEvalHtml(s, sIdx, players) {
             const ev = s.seasonEval || {};
@@ -1352,7 +1517,6 @@
             closePsPlayerModal(); saveStateToStorage(); refreshAppUI(); alert('저장되었습니다.');
         }
 
-        // 🌟 수정된 핵심 최신화 함수 (이전 버전의 안정적인 연장 로직 복원 + 메모/올스타 유지)
         function triggerUpdateUpToGame(sIdx, targetGameNum) {
             const season = seasons[sIdx]; 
             const players = sortMatrixPlayers(getSeasonEffectiveRoster(season).filter(p => p.type !== '방출'));
@@ -1369,7 +1533,6 @@
                     if (tItem.type === 'game') {
                         let hasExplicitData = season.gamesData?.['reg']?.[p.name]?.[tItem.gNum]?.status;
                         
-                        // 이미 데이터가 입력되어 있지 않은 빈 칸인 경우에만 직전 상태를 이어받음
                         if (!hasExplicitData && !statusMap[i]?.status) {
                             let prevStatus = null;
                             if (i > 0) {
@@ -1380,7 +1543,6 @@
                                 }
                             }
                             
-                            // 직전 상태가 마이너이거나 메이저일 때, 10경기 의무 기간이 끝나도 끊기지 않고 1경기씩 계속 마이너 연장됨
                             if (prevStatus === '마이너' || prevStatus === '메이저') {
                                 if (!season.gamesData['reg']) season.gamesData['reg'] = {};
                                 if (!season.gamesData['reg'][p.name]) season.gamesData['reg'][p.name] = {};
@@ -1430,7 +1592,7 @@
             memoCtx = { sIdx, evalType, rangeType, playerName };
             const season = seasons[sIdx]; let content = '';
             if (evalType === 'seasonEval') content = season.seasonEval[rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments']?.[playerName]?.body || '';
-            else if (evalType === 'psEval') content = season.psEval[rangeType]?.[playerName]?.body || '';
+            else if (evalType === 'psEval') content = season.psEval[rangeType]?.[playerName]?.[body || ''] || '';
             document.getElementById('memoModalTitle').textContent = `[${playerName}] 전체 평가 메모장`;
             document.getElementById('memoModalTextarea').value = content;
             document.getElementById('memoModal').classList.remove('hidden');
@@ -1455,7 +1617,7 @@
         function updateCommentTitle(sIdx, rangeType, playerName, val) { let key = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments'; if (!seasons[sIdx].seasonEval[key][playerName]) seasons[sIdx].seasonEval[key][playerName] = { title: '', body: '' }; seasons[sIdx].seasonEval[key][playerName].title = val; saveStateToStorage(); }
         function updatePsEvalHead(sIdx, field, val) { seasons[sIdx].psEval[field] = val; saveStateToStorage(); }
         function updatePsStat(sIdx, statKey, field, val) { if (!seasons[sIdx].psEval.playerData[statKey]) seasons[sIdx].psEval.playerData[statKey] = {}; seasons[sIdx].psEval.playerData[statKey][field] = val; saveStateToStorage(); }
-        function updatePsCommentTitle(sIdx, seriesEvalKey, playerName, val) { if (!s.psEval[seriesEvalKey][playerName]) seasons[sIdx].psEval[seriesEvalKey][playerName] = { title: '', body: '' }; seasons[sIdx].psEval[seriesEvalKey][playerName].title = val; saveStateToStorage(); }
+        function updatePsCommentTitle(sIdx, seriesEvalKey, playerName, val) { if (!seasons[sIdx].psEval[seriesEvalKey][playerName]) seasons[sIdx].psEval[seriesEvalKey][playerName] = { title: '', body: '' }; seasons[sIdx].psEval[seriesEvalKey][playerName].title = val; saveStateToStorage(); }
     </script>
 </body>
 </html>
