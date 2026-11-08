@@ -567,8 +567,19 @@
                 savedRosterSnapshot: null,
                 gamesData: {}, postseasonGames: { ds: {}, cs: {}, ws: {} },
                 psSeriesPlayerStatus: { ds: {}, cs: {}, ws: {} },
-                seasonEval: { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', playerData: {}, firstHalfComments: {}, fullSeasonComments: {} },
-                psEval: { dsRecord: '', csRecord: '', wsRecord: '', dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', playerData: {}, dsComments: {}, csComments: {}, wsComments: {} }
+                seasonEval: { 
+                    teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', 
+                    firstHalfTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' },
+                    fullSeasonTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' },
+                    playerData: {}, firstHalfComments: {}, fullSeasonComments: {} 
+                },
+                psEval: { 
+                    dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', 
+                    dsTeamEval: { title: '', body: '', win: '', mvp: '' },
+                    csTeamEval: { title: '', body: '', win: '', mvp: '' },
+                    wsTeamEval: { title: '', body: '', win: '', mvp: '' },
+                    playerData: {}, dsComments: {}, csComments: {}, wsComments: {} 
+                }
             }
         ];
 
@@ -590,11 +601,17 @@
                 if (!s.gamesData) s.gamesData = {};
                 if (!s.postseasonGames) s.postseasonGames = { ds: {}, cs: {}, ws: {} };
                 if (!s.psSeriesPlayerStatus) s.psSeriesPlayerStatus = { ds: {}, cs: {}, ws: {} };
-                if (!s.seasonEval) s.seasonEval = { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', playerData: {}, firstHalfComments: {}, fullSeasonComments: {} };
+                if (!s.seasonEval) s.seasonEval = { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', firstHalfTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' }, fullSeasonTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' }, playerData: {}, firstHalfComments: {}, fullSeasonComments: {} };
+                if (!s.seasonEval.firstHalfTeamEval) s.seasonEval.firstHalfTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
+                if (!s.seasonEval.fullSeasonTeamEval) s.seasonEval.fullSeasonTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
                 if (!s.seasonEval.playerData) s.seasonEval.playerData = {};
                 if (!s.seasonEval.firstHalfComments) s.seasonEval.firstHalfComments = {};
                 if (!s.seasonEval.fullSeasonComments) s.seasonEval.fullSeasonComments = {};
-                if (!s.psEval) s.psEval = { dsRecord: '', csRecord: '', wsRecord: '', dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', playerData: {}, dsComments: {}, csComments: {}, wsComments: {} };
+                
+                if (!s.psEval) s.psEval = { dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', dsTeamEval: { title: '', body: '', win: '', mvp: '' }, csTeamEval: { title: '', body: '', win: '', mvp: '' }, wsTeamEval: { title: '', body: '', win: '', mvp: '' }, playerData: {}, dsComments: {}, csComments: {}, wsComments: {} };
+                if (!s.psEval.dsTeamEval) s.psEval.dsTeamEval = { title: '', body: '', win: '', mvp: '' };
+                if (!s.psEval.csTeamEval) s.psEval.csTeamEval = { title: '', body: '', win: '', mvp: '' };
+                if (!s.psEval.wsTeamEval) s.psEval.wsTeamEval = { title: '', body: '', win: '', mvp: '' };
                 if (!s.psEval.dsComments) s.psEval.dsComments = {};
                 if (!s.psEval.csComments) s.psEval.csComments = {};
                 if (!s.psEval.wsComments) s.psEval.wsComments = {};
@@ -744,8 +761,19 @@
                 team2Final: seasons.length > 0 ? [...seasons[0].team2Final] : [],
                 savedRosterSnapshot: null, gamesData: {}, postseasonGames: { ds: {}, cs: {}, ws: {} },
                 psSeriesPlayerStatus: { ds: {}, cs: {}, ws: {} },
-                seasonEval: { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', playerData: {}, firstHalfComments: {}, fullSeasonComments: {} },
-                psEval: { dsRecord: '', csRecord: '', wsRecord: '', dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', playerData: {}, dsComments: {}, csComments: {}, wsComments: {} }
+                seasonEval: { 
+                    teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', 
+                    firstHalfTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' },
+                    fullSeasonTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' },
+                    playerData: {}, firstHalfComments: {}, fullSeasonComments: {} 
+                },
+                psEval: { 
+                    dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', 
+                    dsTeamEval: { title: '', body: '', win: '', mvp: '' },
+                    csTeamEval: { title: '', body: '', win: '', mvp: '' },
+                    wsTeamEval: { title: '', body: '', win: '', mvp: '' },
+                    playerData: {}, dsComments: {}, csComments: {}, wsComments: {} 
+                }
             });
             normalizeSeasonsData();
             saveStateToStorage(); 
@@ -760,8 +788,8 @@
                         name: '기본 시즌', targetTeam: 'team1', draftState: { starter: false, relief: false, bullpen: false }, 
                         team1Draft: [], team2Draft: [], team1Final: [], team2Final: [], savedRosterSnapshot: null, 
                         gamesData: {}, postseasonGames: { ds: {}, cs: {}, ws: {} }, psSeriesPlayerStatus: { ds: {}, cs: {}, ws: {} }, 
-                        seasonEval: { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', playerData: {}, firstHalfComments: {}, fullSeasonComments: {} }, 
-                        psEval: { dsRecord: '', csRecord: '', wsRecord: '', dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', playerData: {}, dsComments: {}, csComments: {}, wsComments: {} } 
+                        seasonEval: { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', firstHalfTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' }, fullSeasonTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' }, playerData: {}, firstHalfComments: {}, fullSeasonComments: {} }, 
+                        psEval: { dsStatus: 'CS 진출', csStatus: 'WS 진출', wsStatus: '우승', dsTeamEval: { title: '', body: '', win: '', mvp: '' }, csTeamEval: { title: '', body: '', win: '', mvp: '' }, wsTeamEval: { title: '', body: '', win: '', mvp: '' }, playerData: {}, dsComments: {}, csComments: {}, wsComments: {} } 
                     });
                 }
                 currentActiveView = 'op'; 
@@ -1484,7 +1512,6 @@
                 let prevSt = (prevIdx !== -1) ? statusMap[prevIdx]?.status : null;
                 let curSt = (curIdx !== -1) ? statusMap[curIdx]?.status : null;
 
-                // 수정: 10G 최신화 시점에 현재(targetGameNum) 마이너 상태이면서 직전 게임(prevG)에도 마이너였던 선수 (마이너 기간 완료 시점)
                 if (curSt === '마이너' && prevSt === '마이너') {
                     callupCount++;
                     callupListEl.innerHTML += `
@@ -1515,7 +1542,6 @@
             if (!season.gamesData['reg']) season.gamesData['reg'] = {};
 
             if (!season.gamesData['reg'][callupName]) season.gamesData['reg'][callupName] = {};
-            // 선택된 선수의 targetGameNum에 등록되어 있던 '마이너'를 '메이저'로 전환
             season.gamesData['reg'][callupName][targetGameNum] = { status: '메이저', comment: '부상 대체 콜업' };
 
             closeInjuryOccurrenceModal();
@@ -1758,6 +1784,8 @@
 
         function renderSeasonEvalHtml(s, sIdx, players) {
             const ev = s.seasonEval || {};
+            const fhEval = ev.firstHalfTeamEval || {};
+            const fsEval = ev.fullSeasonTeamEval || {};
             return `
                 <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border shadow-sm space-y-6">
                     <h2 class="text-base sm:text-lg font-bold">📊 ${s.name} 시즌 평가</h2>
@@ -1768,8 +1796,46 @@
                         <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border"><label class="text-[10px] text-slate-500">팀 ERA</label><input type="text" value="${ev.teamEra || ''}" onchange="updateTeamEval(${sIdx}, 'teamEra', this.value)" class="w-full bg-transparent font-bold text-sm"></div>
                         <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border"><label class="text-[10px] text-slate-500">팀 OPS</label><input type="text" value="${ev.teamOps || ''}" onchange="updateTeamEval(${sIdx}, 'teamOps', this.value)" class="w-full bg-transparent font-bold text-sm"></div>
                     </div>
-                    <div class="space-y-3"><h3 class="font-bold text-sm text-brand-600">📌 전반기 평가 (1G ~ 84G)</h3><div class="overflow-x-auto border rounded-2xl"><table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'firstHalf')}</table></div></div>
-                    <div class="space-y-3 pt-4"><h3 class="font-bold text-sm text-purple-600">📌 전체 시즌 평가 (1G ~ 160G)</h3><div class="overflow-x-auto border rounded-2xl"><table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'fullSeason')}</table></div></div>
+
+                    <!-- 전반기 팀 종합 평가 영역 -->
+                    <div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border space-y-4">
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                            <div class="flex items-center space-x-2 flex-1 w-full">
+                                <h3 class="font-bold text-sm text-brand-600 shrink-0">📌 전반기 팀 종합 평가</h3>
+                                <input type="text" value="${fhEval.title || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'firstHalfTeamEval', 'title', this.value)" placeholder="평가 제목 입력" class="w-full sm:w-72 border rounded-xl px-3 py-2 text-xs font-bold bg-white dark:bg-slate-800">
+                                <button onclick="openMemoModal(${sIdx}, 'seasonEval', 'firstHalfTeam', 'team')" class="px-3 py-2 text-xs bg-brand-600 text-white rounded-xl font-semibold shrink-0 shadow-sm">전체 평가</button>
+                            </div>
+                            <div class="grid grid-cols-5 gap-2 w-full lg:w-auto shrink-0">
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">순위</label><input type="text" value="${fhEval.rank || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'firstHalfTeamEval', 'rank', this.value)" class="w-12 bg-transparent font-bold text-xs text-center"></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">승패</label><input type="text" value="${fhEval.win || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'firstHalfTeamEval', 'win', this.value)" class="w-16 bg-transparent font-bold text-xs text-center" placeholder="승-패"></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">승률</label><input type="text" value="${fhEval.winRate || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'firstHalfTeamEval', 'winRate', this.value)" class="w-14 bg-transparent font-bold text-xs text-center"></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">ERA</label><input type="text" value="${fhEval.era || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'firstHalfTeamEval', 'era', this.value)" class="w-14 bg-transparent font-bold text-xs text-center"></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">OPS</label><input type="text" value="${fhEval.ops || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'firstHalfTeamEval', 'ops', this.value)" class="w-14 bg-transparent font-bold text-xs text-center"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3"><h3 class="font-bold text-sm text-brand-600">👤 전반기 선수별 평가 (1G ~ 84G)</h3><div class="overflow-x-auto border rounded-2xl"><table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'firstHalf')}</table></div></div>
+                    
+                    <!-- 전체 시즌 팀 종합 평가 영역 -->
+                    <div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border space-y-4 pt-4">
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                            <div class="flex items-center space-x-2 flex-1 w-full">
+                                <h3 class="font-bold text-sm text-purple-600 shrink-0">📌 전체 시즌 팀 종합 평가</h3>
+                                <input type="text" value="${fsEval.title || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'fullSeasonTeamEval', 'title', this.value)" placeholder="평가 제목 입력" class="w-full sm:w-72 border rounded-xl px-3 py-2 text-xs font-bold bg-white dark:bg-slate-800">
+                                <button onclick="openMemoModal(${sIdx}, 'seasonEval', 'fullSeasonTeam', 'team')" class="px-3 py-2 text-xs bg-purple-600 text-white rounded-xl font-semibold shrink-0 shadow-sm">전체 평가</button>
+                            </div>
+                            <div class="grid grid-cols-5 gap-2 w-full lg:w-auto shrink-0">
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">순위</label><input type="text" value="${fsEval.rank || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'fullSeasonTeamEval', 'rank', this.value)" class="w-12 bg-transparent font-bold text-xs text-center"></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">승패</label><input type="text" value="${fsEval.win || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'fullSeasonTeamEval', 'win', this.value)" class="w-16 bg-transparent font-bold text-xs text-center" placeholder="승-패"></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">승률</label><input type="text" value="${fsEval.winRate || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'fullSeasonTeamEval', 'winRate', this.value)" class="w-14 bg-transparent font-bold text-xs text-center"></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">ERA</label><input type="text" value="${fsEval.era || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'fullSeasonTeamEval', 'era', this.value)" class="w-14 bg-transparent font-bold text-xs text-center"></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">OPS</label><input type="text" value="${fsEval.ops || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'fullSeasonTeamEval', 'ops', this.value)" class="w-14 bg-transparent font-bold text-xs text-center"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 pt-2"><h3 class="font-bold text-sm text-purple-600">👤 전체 시즌 선수별 평가 (1G ~ 160G)</h3><div class="overflow-x-auto border rounded-2xl"><table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'fullSeason')}</table></div></div>
                 </div>
             `;
         }
@@ -1819,7 +1885,6 @@
         }
 
         function renderPsEvalHtml(s, sIdx, players) {
-            const psev = s.psEval || {};
             if (!s.psSeriesPlayerStatus) s.psSeriesPlayerStatus = { ds: {}, cs: {}, ws: {} };
             const dsRegistered = players.filter(p => (s.psSeriesPlayerStatus.ds?.[p.name] || '미등록') === '등록');
             const csRegistered = players.filter(p => (s.psSeriesPlayerStatus.cs?.[p.name] || '미등록') === '등록');
@@ -1828,46 +1893,98 @@
             return `
                 <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border shadow-sm space-y-6">
                     <h2 class="text-base sm:text-lg font-bold">🏅 ${s.name} 포스트시즌 평가</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border flex justify-between items-center"><input type="text" value="${psev.dsRecord || ''}" onchange="updatePsEvalHead(${sIdx}, 'dsRecord', this.value)" placeholder="DS 성적" class="bg-transparent font-bold text-sm w-28"><select onchange="updatePsEvalHead(${sIdx}, 'dsStatus', this.value)" class="text-xs border rounded p-1 bg-transparent"><option value="CS 진출" ${psev.dsStatus==='CS 진출'?'selected':''}>CS 진출</option><option value="탈락" ${psev.dsStatus==='탈락'?'selected':''}>탈락</option></select></div>
-                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border flex justify-between items-center"><input type="text" value="${psev.csRecord || ''}" onchange="updatePsEvalHead(${sIdx}, 'csRecord', this.value)" placeholder="CS 성적" class="bg-transparent font-bold text-sm w-28"><select onchange="updatePsEvalHead(${sIdx}, 'csStatus', this.value)" class="text-xs border rounded p-1 bg-transparent"><option value="WS 진출" ${psev.csStatus==='WS 진출'?'selected':''}>WS 진출</option><option value="탈락" ${psev.csStatus==='탈락'?'selected':''}>탈락</option></select></div>
-                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border flex justify-between items-center"><input type="text" value="${psev.wsRecord || ''}" onchange="updatePsEvalHead(${sIdx}, 'wsRecord', this.value)" placeholder="WS 성적" class="bg-transparent font-bold text-sm w-28"><select onchange="updatePsEvalHead(${sIdx}, 'wsStatus', this.value)" class="text-xs border rounded p-1 bg-transparent"><option value="우승" ${psev.wsStatus==='우승'?'selected':''}>우승</option><option value="패배" ${psev.wsStatus==='패배'?'selected':''}>패배</option></select></div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-                        ${renderPsSeriesEvalBox(s, sIdx, 'dsComments', '디비전 시리즈 (DS) 평가', dsRegistered)}
-                        ${renderPsSeriesEvalBox(s, sIdx, 'csComments', '챔피언십 시리즈 (CS) 평가', csRegistered)}
-                        ${renderPsSeriesEvalBox(s, sIdx, 'wsComments', '월드 시리즈 (WS) 평가', wsRegistered)}
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        ${renderPsSeriesEvalBox(s, sIdx, 'ds', '디비전 시리즈 (DS) 평가', dsRegistered, players)}
+                        ${renderPsSeriesEvalBox(s, sIdx, 'cs', '챔피언십 시리즈 (CS) 평가', csRegistered, players)}
+                        ${renderPsSeriesEvalBox(s, sIdx, 'ws', '월드 시리즈 (WS) 평가', wsRegistered, players)}
                     </div>
                 </div>
             `;
         }
 
-        function renderPsSeriesEvalBox(s, sIdx, seriesEvalKey, title, registeredPlayers) {
-            let html = `<div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border space-y-4"><h3 class="font-bold text-sm">${title}</h3>`;
-            if (registeredPlayers.length === 0) html += `<p class="text-xs text-slate-400">해당 시리즈에 '등록'된 선수가 없습니다.</p>`;
-            registeredPlayers.forEach(p => {
-                let comment = s.psEval[seriesEvalKey]?.[p.name] || { title: '', body: '' };
-                let statKey = `ps_${seriesEvalKey}_${p.name}`;
-                let st = s.psEval.playerData?.[statKey] || {};
+        function renderPsSeriesEvalBox(s, sIdx, seriesKey, title, registeredPlayers, allPlayers) {
+            const teamEvalKey = `${seriesKey}TeamEval`;
+            if (!s.psEval[teamEvalKey]) s.psEval[teamEvalKey] = { title: '', body: '', win: '', mvp: '' };
+            const tEval = s.psEval[teamEvalKey];
+            const statusKey = `${seriesKey}Status`;
+            const currentStatus = s.psEval[statusKey] || (seriesKey === 'ds' ? 'CS 진출' : (seriesKey === 'cs' ? 'WS 진출' : '우승'));
 
-                html += `
-                    <div class="p-3 bg-white dark:bg-slate-800 rounded-xl border space-y-2">
-                        <div class="font-bold text-xs">${p.name}</div>
-                        <div class="grid grid-cols-7 gap-1 text-center">
-                            <div><label class="text-[9px] text-slate-400">ERA</label><input type="text" value="${st.era || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'era', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
-                            <div><label class="text-[9px] text-slate-400">IP</label><input type="text" value="${st.ip || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'ip', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
-                            <div><label class="text-[9px] text-slate-400">K</label><input type="text" value="${st.k || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'k', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
-                            <div><label class="text-[9px] text-slate-400">W</label><input type="text" value="${st.win || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'win', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
-                            <div><label class="text-[9px] text-slate-400">L</label><input type="text" value="${st.loss || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'loss', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
-                            <div><label class="text-[9px] text-slate-400">H</label><input type="text" value="${st.hold || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'hold', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
-                            <div><label class="text-[9px] text-slate-400">SV</label><input type="text" value="${st.save || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'save', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
-                        </div>
-                        <input type="text" value="${comment.title || ''}" onchange="updatePsCommentTitle(${sIdx}, '${seriesEvalKey}', '${p.name}', this.value)" placeholder="평가 제목" class="w-full text-xs border rounded px-2 py-1 font-semibold bg-transparent">
-                        <button onclick="openMemoModal(${sIdx}, 'psEval', '${seriesEvalKey}', '${p.name}')" class="text-[10px] text-brand-600 underline font-semibold">전체 평가 보기</button>
+            let html = `
+                <div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border space-y-4">
+                    <div class="flex justify-between items-center border-b pb-3">
+                        <h3 class="font-bold text-sm">${title}</h3>
+                        <select onchange="updatePsEvalStatus(${sIdx}, '${statusKey}', this.value)" class="text-xs border rounded p-1 bg-transparent">
+                            <option value="진출" ${currentStatus==='진출'?'selected':''}>진출</option>
+                            <option value="CS 진출" ${currentStatus==='CS 진출'?'selected':''}>CS 진출</option>
+                            <option value="WS 진출" ${currentStatus==='WS 진출'?'selected':''}>WS 진출</option>
+                            <option value="우승" ${currentStatus==='우승'?'selected':''}>우승</option>
+                            <option value="탈락" ${currentStatus==='탈락'?'selected':''}>탈락</option>
+                        </select>
                     </div>
-                `;
+
+                    <!-- 시리즈 팀 종합 평가 영역 (2단 세로 구조 정돈) -->
+                    <div class="bg-white dark:bg-slate-800 p-3.5 rounded-xl border space-y-3">
+                        <!-- 첫 번째 줄: 평가 제목 입력 및 전체 평가 버튼 -->
+                        <div class="flex items-center space-x-2">
+                            <input type="text" value="${tEval.title || ''}" onchange="updatePsTeamEval(${sIdx}, '${teamEvalKey}', 'title', this.value)" placeholder="평가 제목 입력" class="flex-1 border rounded-xl px-3 py-2 text-xs font-bold bg-slate-50 dark:bg-slate-900">
+                            <button onclick="openMemoModal(${sIdx}, 'psEvalTeam', '${teamEvalKey}', 'team')" class="px-3 py-2 text-xs bg-brand-600 text-white rounded-xl font-semibold shrink-0 shadow-sm">전체 평가</button>
+                        </div>
+                        <!-- 두 번째 줄: 시리즈 MVP 선택 및 승-패 기록 -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[9px] text-slate-400 font-semibold mb-1">시리즈 MVP</label>
+                                <select onchange="updatePsTeamEval(${sIdx}, '${teamEvalKey}', 'mvp', this.value)" class="w-full border rounded-xl px-2.5 py-2 text-xs font-bold bg-slate-50 dark:bg-slate-900">
+                                    <option value="">(시리즈 MVP)</option>
+            `;
+            
+            // ✅ 수정됨: 모든 선수(allPlayers)가 아닌 해당 시리즈에 등록된 선수(registeredPlayers)만 리스트업
+            registeredPlayers.forEach(p => {
+                const isSelected = tEval.mvp === p.name ? 'selected' : '';
+                html += `<option value="${p.name}" ${isSelected}>${p.name} (${p.position})</option>`;
             });
-            html += `</div>`;
+
+            html += `
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[9px] text-slate-400 font-semibold mb-1">승-패</label>
+                                <input type="text" value="${tEval.win || ''}" onchange="updatePsTeamEval(${sIdx}, '${teamEvalKey}', 'win', this.value)" placeholder="승-패" class="w-full border rounded-xl px-2.5 py-2 text-xs font-bold text-center bg-slate-50 dark:bg-slate-900">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <h4 class="font-bold text-xs text-slate-500 uppercase tracking-wider">선수별 평가</h4>
+            `;
+
+            if (registeredPlayers.length === 0) {
+                html += `<p class="text-xs text-slate-400 p-2">해당 시리즈에 '등록'된 선수가 없습니다.</p>`;
+            } else {
+                registeredPlayers.forEach(p => {
+                    let commentKey = `${seriesKey}Comments`;
+                    let comment = s.psEval[commentKey]?.[p.name] || { title: '', body: '' };
+                    let statKey = `ps_${commentKey}_${p.name}`;
+                    let st = s.psEval.playerData?.[statKey] || {};
+
+                    html += `
+                        <div class="p-3 bg-white dark:bg-slate-800 rounded-xl border space-y-2">
+                            <div class="font-bold text-xs">${p.name}</div>
+                            <div class="grid grid-cols-7 gap-1 text-center">
+                                <div><label class="text-[9px] text-slate-400">ERA</label><input type="text" value="${st.era || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'era', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                                <div><label class="text-[9px] text-slate-400">IP</label><input type="text" value="${st.ip || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'ip', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                                <div><label class="text-[9px] text-slate-400">K</label><input type="text" value="${st.k || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'k', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                                <div><label class="text-[9px] text-slate-400">W</label><input type="text" value="${st.win || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'win', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                                <div><label class="text-[9px] text-slate-400">L</label><input type="text" value="${st.loss || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'loss', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                                <div><label class="text-[9px] text-slate-400">H</label><input type="text" value="${st.hold || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'hold', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                                <div><label class="text-[9px] text-slate-400">SV</label><input type="text" value="${st.save || ''}" onchange="updatePsStat(${sIdx}, '${statKey}', 'save', this.value)" class="w-full border rounded text-[10px] text-center bg-transparent"></div>
+                            </div>
+                            <input type="text" value="${comment.title || ''}" onchange="updatePsCommentTitle(${sIdx}, '${commentKey}', '${p.name}', this.value)" placeholder="평가 제목" class="w-full text-xs border rounded px-2 py-1 font-semibold bg-transparent">
+                            <button onclick="openMemoModal(${sIdx}, 'psEval', '${commentKey}', '${p.name}')" class="text-[10px] text-brand-600 underline font-semibold">전체 평가 보기</button>
+                        </div>
+                    `;
+                });
+            }
+            html += `</div></div>`;
             return html;
         }
 
@@ -1953,7 +2070,6 @@
             const grandTimeline = getGrandMasterTimeline(); 
             let targetIdx = grandTimeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum);
             
-            // 1. 공백 최신화 처리
             players.forEach(p => {
                 const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name); 
                 
@@ -1984,7 +2100,6 @@
                 }
             });
 
-            // 2. 부상 종료 선수가 있는지 확인 (targetGameNum 시점에 부상이 끝나는 경우)
             let returningPlayer = null;
             players.forEach(p => {
                 if (returningPlayer) return;
@@ -2007,7 +2122,6 @@
                 return;
             }
 
-            // 3. 무작위 부상 발생 체크 (13% 확률)
             if (Math.random() < 0.13) {
                 let eligibleCandidates = [];
                 players.forEach(p => {
@@ -2047,9 +2161,29 @@
         function openMemoModal(sIdx, evalType, rangeType, playerName) {
             memoCtx = { sIdx, evalType, rangeType, playerName };
             const season = seasons[sIdx]; let content = '';
-            if (evalType === 'seasonEval') content = season.seasonEval[rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments']?.[playerName]?.body || '';
-            else if (evalType === 'psEval') content = season.psEval[rangeType]?.[playerName]?.body || '';
-            document.getElementById('memoModalTitle').textContent = `[${playerName}] 전체 평가 메모장`;
+            if (evalType === 'seasonEval') {
+                if (rangeType === 'firstHalfTeam') {
+                    content = season.seasonEval.firstHalfTeamEval?.body || '';
+                } else if (rangeType === 'fullSeasonTeam') {
+                    content = season.seasonEval.fullSeasonTeamEval?.body || '';
+                } else {
+                    content = season.seasonEval[rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments']?.[playerName]?.body || '';
+                }
+            } else if (evalType === 'psEval') {
+                content = season.psEval[rangeType]?.[playerName]?.body || '';
+            } else if (evalType === 'psEvalTeam') {
+                content = season.psEval[rangeType]?.body || '';
+            }
+            
+            let modalTitleText = '';
+            if (rangeType === 'dsTeamEval') modalTitleText = '[디비전 시리즈 팀 종합 평가] 전체 평가';
+            else if (rangeType === 'csTeamEval') modalTitleText = '[챔피언십 시리즈 팀 종합 평가] 전체 평가';
+            else if (rangeType === 'wsTeamEval') modalTitleText = '[월드 시리즈 팀 종합 평가] 전체 평가';
+            else if (rangeType === 'firstHalfTeam') modalTitleText = '[전반기 팀 종합 평가] 전체 평가';
+            else if (rangeType === 'fullSeasonTeam') modalTitleText = '[전체 시즌 팀 종합 평가] 전체 평가';
+            else modalTitleText = `[${playerName}] 전체 평가 메모장`;
+
+            document.getElementById('memoModalTitle').textContent = modalTitleText;
             document.getElementById('memoModalTextarea').value = content;
             document.getElementById('memoModal').classList.remove('hidden');
         }
@@ -2058,20 +2192,44 @@
             const { sIdx, evalType, rangeType, playerName } = memoCtx; const season = seasons[sIdx];
             let bodyText = document.getElementById('memoModalTextarea').value;
             if (evalType === 'seasonEval') {
-                let key = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments';
-                if (!season.seasonEval[key][playerName]) season.seasonEval[key][playerName] = { title: '', body: '' };
-                season.seasonEval[key][playerName].body = bodyText;
+                if (rangeType === 'firstHalfTeam') {
+                    if (!season.seasonEval.firstHalfTeamEval) season.seasonEval.firstHalfTeamEval = {};
+                    season.seasonEval.firstHalfTeamEval.body = bodyText;
+                } else if (rangeType === 'fullSeasonTeam') {
+                    if (!season.seasonEval.fullSeasonTeamEval) season.seasonEval.fullSeasonTeamEval = {};
+                    season.seasonEval.fullSeasonTeamEval.body = bodyText;
+                } else {
+                    let key = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments';
+                    if (!season.seasonEval[key][playerName]) season.seasonEval[key][playerName] = { title: '', body: '' };
+                    season.seasonEval[key][playerName].body = bodyText;
+                }
             } else if (evalType === 'psEval') {
                 if (!season.psEval[rangeType][playerName]) season.psEval[rangeType][playerName] = { title: '', body: '' };
                 season.psEval[rangeType][playerName].body = bodyText;
+            } else if (evalType === 'psEvalTeam') {
+                if (!season.psEval[rangeType]) season.psEval[rangeType] = { title: '', body: '', win: '', mvp: '' };
+                season.psEval[rangeType].body = bodyText;
             }
             closeMemoModal(); saveStateToStorage(); refreshAppUI(); alert('평가 본문이 저장되었습니다.');
         }
 
         function updateTeamEval(sIdx, field, val) { seasons[sIdx].seasonEval[field] = val; saveStateToStorage(); }
+        function updateTeamEvalCustom(sIdx, evalObjKey, field, val) {
+            if (!seasons[sIdx].seasonEval[evalObjKey]) seasons[sIdx].seasonEval[evalObjKey] = {};
+            seasons[sIdx].seasonEval[evalObjKey][field] = val;
+            saveStateToStorage();
+        }
+        function updatePsTeamEval(sIdx, teamEvalKey, field, val) {
+            if (!seasons[sIdx].psEval[teamEvalKey]) seasons[sIdx].psEval[teamEvalKey] = { title: '', body: '', win: '', mvp: '' };
+            seasons[sIdx].psEval[teamEvalKey][field] = val;
+            saveStateToStorage();
+        }
+        function updatePsEvalStatus(sIdx, statusKey, val) {
+            seasons[sIdx].psEval[statusKey] = val;
+            saveStateToStorage();
+        }
         function updatePlayerStat(sIdx, statKey, field, val) { if (!seasons[sIdx].seasonEval.playerData[statKey]) seasons[sIdx].seasonEval.playerData[statKey] = {}; seasons[sIdx].seasonEval.playerData[statKey][field] = val; saveStateToStorage(); }
         function updateCommentTitle(sIdx, rangeType, playerName, val) { let key = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments'; if (!seasons[sIdx].seasonEval[key][playerName]) seasons[sIdx].seasonEval[key][playerName] = { title: '', body: '' }; seasons[sIdx].seasonEval[key][playerName].title = val; saveStateToStorage(); }
-        function updatePsEvalHead(sIdx, field, val) { seasons[sIdx].psEval[field] = val; saveStateToStorage(); }
         function updatePsStat(sIdx, statKey, field, val) { if (!seasons[sIdx].psEval.playerData[statKey]) seasons[sIdx].psEval.playerData[statKey] = {}; seasons[sIdx].psEval.playerData[statKey][field] = val; saveStateToStorage(); }
         function updatePsCommentTitle(sIdx, seriesEvalKey, playerName, val) { if (!seasons[sIdx].psEval[seriesEvalKey][playerName]) seasons[sIdx].psEval[seriesEvalKey][playerName] = { title: '', body: '' }; seasons[sIdx].psEval[seriesEvalKey][playerName].title = val; saveStateToStorage(); }
     </script>
