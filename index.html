@@ -1922,22 +1922,20 @@
                         </select>
                     </div>
 
-                    <!-- 시리즈 팀 종합 평가 영역 (2단 세로 구조 정돈) -->
-                    <div class="bg-white dark:bg-slate-800 p-3.5 rounded-xl border space-y-3">
+                    <!-- 시리즈 팀 종합 평가 영역 (라벨 제거 및 간격 압축) -->
+                    <div class="bg-white dark:bg-slate-800 p-3.5 rounded-xl border space-y-2">
                         <!-- 첫 번째 줄: 평가 제목 입력 및 전체 평가 버튼 -->
                         <div class="flex items-center space-x-2">
                             <input type="text" value="${tEval.title || ''}" onchange="updatePsTeamEval(${sIdx}, '${teamEvalKey}', 'title', this.value)" placeholder="평가 제목 입력" class="flex-1 border rounded-xl px-3 py-2 text-xs font-bold bg-slate-50 dark:bg-slate-900">
                             <button onclick="openMemoModal(${sIdx}, 'psEvalTeam', '${teamEvalKey}', 'team')" class="px-3 py-2 text-xs bg-brand-600 text-white rounded-xl font-semibold shrink-0 shadow-sm">전체 평가</button>
                         </div>
-                        <!-- 두 번째 줄: 시리즈 MVP 선택 및 승-패 기록 -->
+                        <!-- 두 번째 줄: 시리즈 MVP 선택 및 승-패 기록 (라벨 제거됨) -->
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="block text-[9px] text-slate-400 font-semibold mb-1">시리즈 MVP</label>
                                 <select onchange="updatePsTeamEval(${sIdx}, '${teamEvalKey}', 'mvp', this.value)" class="w-full border rounded-xl px-2.5 py-2 text-xs font-bold bg-slate-50 dark:bg-slate-900">
-                                    <option value="">(시리즈 MVP)</option>
+                                    <option value="">(시리즈 MVP 선택)</option>
             `;
             
-            // ✅ 수정됨: 모든 선수(allPlayers)가 아닌 해당 시리즈에 등록된 선수(registeredPlayers)만 리스트업
             registeredPlayers.forEach(p => {
                 const isSelected = tEval.mvp === p.name ? 'selected' : '';
                 html += `<option value="${p.name}" ${isSelected}>${p.name} (${p.position})</option>`;
@@ -1947,7 +1945,6 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-[9px] text-slate-400 font-semibold mb-1">승-패</label>
                                 <input type="text" value="${tEval.win || ''}" onchange="updatePsTeamEval(${sIdx}, '${teamEvalKey}', 'win', this.value)" placeholder="승-패" class="w-full border rounded-xl px-2.5 py-2 text-xs font-bold text-center bg-slate-50 dark:bg-slate-900">
                             </div>
                         </div>
