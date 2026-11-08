@@ -1945,7 +1945,7 @@
                                 </select>
                             </div>
                             <div>
-                                <input type="text" value="${tEval.win || ''}" onchange="updatePsTeamEval(${sIdx}, '${teamEvalKey}', 'win', this.value)" placeholder="승-패" class="w-full border rounded-xl px-2.5 py-2 text-xs font-bold text-center bg-slate-50 dark:bg-slate-900">
+                                <input type="text" value="${tEval.win || ''}" onchange="updatePsTeamEval(${sIdx}, '${teamEvalKey}', 'win', this.value)" placeholder="승-패 (예: 3승 1패)" class="w-full border rounded-xl px-2.5 py-2 text-xs font-bold text-center bg-slate-50 dark:bg-slate-900">
                             </div>
                         </div>
                     </div>
@@ -2059,7 +2059,7 @@
             closePsPlayerModal(); saveStateToStorage(); refreshAppUI(); alert('저장되었습니다.');
         }
 
-        function triggerUpdateUpToGame(sIdx, targetGameNum) {
+function triggerUpdateUpToGame(sIdx, targetGameNum) {
             const season = seasons[sIdx]; 
             const players = sortMatrixPlayers(getSeasonEffectiveRoster(season).filter(p => p.type !== '방출'));
             if (!confirm(`${targetGameNum}G까지 공백 칸을 최신화하시겠습니까?`)) return;
@@ -2078,10 +2078,15 @@
                         if (!hasExplicitData && !statusMap[i]?.status) {
                             let prevStatus = null;
                             if (i > 0) {
-                                let prevTItem = timeline[i - 1];
-                                if (prevTItem.type === 'game') {
+                                // [수정] 올스타 브레이크(allstar)를 건너뛰고 이전 실제 경기 항목을 거슬러 올라가며 탐색
+                                let prevIdx = i - 1;
+                                while (prevIdx >= 0 && timeline[prevIdx].type !== 'game') {
+                                    prevIdx--;
+                                }
+                                if (prevIdx >= 0) {
+                                    let prevTItem = timeline[prevIdx];
                                     let prevExplicit = season.gamesData?.['reg']?.[p.name]?.[prevTItem.gNum]?.status;
-                                    prevStatus = prevExplicit || statusMap[i - 1]?.status;
+                                    prevStatus = prevExplicit || statusMap[prevIdx]?.status;
                                 }
                             }
                             
@@ -2101,8 +2106,8 @@
             players.forEach(p => {
                 if (returningPlayer) return;
                 const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name);
-                let curIdx = timeline.findIndex(t => t.type === 'game' && t.gNum === targetGameNum);
-                let prevIdx = timeline.findIndex(t => t.type === 'game' && t.gNum === targetGameNum - 1);
+                let curIdx = timeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum);
+                let prevIdx = timeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum - 1);
                 if (curIdx !== -1 && prevIdx !== -1) {
                     let prevSt = statusMap[prevIdx]?.status;
                     let curSt = statusMap[curIdx]?.status;
@@ -2134,12 +2139,12 @@
                 if (eligibleCandidates.length > 0) {
                     let injuredPlayer = eligibleCandidates[Math.floor(Math.random() * eligibleCandidates.length)];
                     let r = Math.random() * 100;
-                    let injuryType = '', injuryLabel = '';
-                    if (r < 35) { injuryType = '부상 15일'; injuryLabel = '15일 부상'; }
-                    else if (r < 35 + 25) { injuryType = '부상 30일'; injuryLabel = '30일 부상'; }
-                    else if (r < 35 + 25 + 20) { injuryType = '부상 60일'; injuryLabel = '60일 부상'; }
-                    else if (r < 35 + 25 + 20 + 15) { injuryType = '시즌아웃'; injuryLabel = '시즌 아웃'; }
-                    else { injuryType = '토미존'; injuryLabel = '토미존 수술'; }
+                    let injuryType = '';
+                    if (r < 35) injuryType = '부상 15일';
+                    else if (r < 60) injuryType = '부상 30일';
+                    else if (r < 80) injuryType = '부상 60일';
+                    else if (r < 95) injuryType = '시즌아웃';
+                    else injuryType = '토미존';
 
                     if (!season.gamesData['reg']) season.gamesData['reg'] = {};
                     if (!season.gamesData['reg'][injuredPlayer.name]) season.gamesData['reg'][injuredPlayer.name] = {};
