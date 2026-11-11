@@ -1512,7 +1512,8 @@
                 let prevSt = (prevIdx !== -1) ? statusMap[prevIdx]?.status : null;
                 let curSt = (curIdx !== -1) ? statusMap[curIdx]?.status : null;
 
-                if (curSt === '마이너' && prevSt === '마이너') {
+                // [수정] 직전 경기까지는 마이너였고(prevSt === '마이너'), 현재 목표 경기 시점에 마이너 의무 기간이 만료된(!curSt) 선수만 콜업 후보로 선정
+                if (prevSt === '마이너' && !curSt) {
                     callupCount++;
                     callupListEl.innerHTML += `
                         <label class="flex items-center space-x-2 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer">
@@ -1525,6 +1526,7 @@
             });
 
             if (callupCount === 0) callupListEl.innerHTML = `<p class="text-slate-400 p-2">콜업 가능한 마이너 선수가 없습니다.</p>`;
+            // [수정] add -> remove로 변경하여 부상 발생 시 모달이 정상적으로 화면에 표시되도록 수정
             document.getElementById('injuryOccurrenceModal').classList.remove('hidden');
         }
 
