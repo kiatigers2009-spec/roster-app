@@ -172,7 +172,7 @@
         <section id="view-op" class="space-y-6 max-w-7xl mx-auto">
             <div class="flex overflow-x-auto custom-scrollbar gap-2 p-1.5 bg-slate-200/60 dark:bg-slate-800 rounded-2xl border border-slate-200/80 whitespace-nowrap">
                 <button onclick="switchOpSubTab('global')" id="subnav-global" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition shadow-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white">전체 로스터 관리</button>
-                <button onclick="switchOpSubTab('roster')" id="subnav-roster" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition text-slate-600 dark:text-slate-400 hover:text-slate-900">로스터 관리</button>
+                <button onclick="switchOpSubTab('roster')" id="subnav-roster" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition text-slate-600 dark:text-slate-400 hover:text-slate-900">세부 로스터 관리</button>
                 <button onclick="switchOpSubTab('draft')" id="subnav-draft" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition text-slate-600 dark:text-slate-400 hover:text-slate-900">드래프트</button>
                 <button onclick="switchOpSubTab('team1')" id="subnav-team1" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition text-slate-600 dark:text-slate-400 hover:text-slate-900">1팀 로스터</button>
                 <button onclick="switchOpSubTab('team2')" id="subnav-team2" class="op-subnav-btn flex-1 min-w-[120px] py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-xl transition text-slate-600 dark:text-slate-400 hover:text-slate-900">2팀 로스터</button>
@@ -250,7 +250,7 @@
                     <table class="w-full text-xs"><tbody id="rosterReleaseBody" class="divide-y"></tbody></table>
                 </div>
 
-                <!-- 등번호 종합 매트릭스 -->
+                <!-- 등번호 명단 관리 -->
                 <div class="bg-white dark:bg-slate-800 rounded-2xl border shadow-sm overflow-hidden space-y-3 p-4 sm:p-5">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-3 gap-2">
                         <h3 class="font-bold text-sm sm:text-base flex items-center space-x-2">
@@ -932,7 +932,7 @@ function normalizeSeasonsData() {
             });
         }
 
-        function renderRosterCategorization() {
+function renderRosterCategorization() {
             const active = globalPlayers.filter(p => p.type !== '방출');
             const starters = sortRosterCategoryList(active.filter(p => p.position === '선발투수'));
             const reliefs = sortRosterCategoryList(active.filter(p => p.position === '릴리프'));
@@ -945,7 +945,51 @@ function normalizeSeasonsData() {
 
             const relBody = document.getElementById('rosterReleaseBody'); relBody.innerHTML = '';
             document.getElementById('rosterReleaseCount').textContent = `${released.length}명`;
-            released.forEach(p => relBody.innerHTML += `<tr><td class="p-2.5 font-bold text-slate-500">${p.name}</td><td class="p-2.5">${p.position}</td><td class="p-2.5">${p.hand}</td><td class="p-2.5 font-mono">#${p.backNum}</td><td class="p-2.5">${getTypeBadgeHtml(p.type)}</td></tr>`);
+            released.forEach(p => {
+                relBody.innerHTML += `
+                    <tr id="released-row-${p.id}">
+                        <td class="p-2.5 font-bold text-slate-500">${p.name}</td>
+                        <td class="p-2.5">${p.position}</td>
+                        <td class="p-2.5">${p.hand}</td>
+                        <td class="p-2.5"><input type="number" value="${p.backNum}" class="edit-released-backnum w-16 border rounded px-2 py-1 text-xs font-mono bg-transparent"></td>
+                        <td class="p-2.5">
+                            <select class="edit-released-type border rounded px-2 py-1 text-xs bg-transparent">
+                                <option value="현역">현역</option>
+                                <option value="밀전드">밀전드</option>
+                                <option value="공통 선수">공통 선수</option>
+                                <option value="절대 선수">절대 선수</option>
+                            </select>
+                        </td>
+                        <td class="p-2.5 text-right space-x-1 whitespace-nowrap">
+                            <button onclick="saveReleasedPlayerBackNum(${p.id})" class="text-white text-xs px-2.5 py-1 bg-brand-600 rounded-lg shadow-sm">저장</button>
+                            <button onclick="reregisterPlayer(${p.id})" class="text-white text-xs px-2.5 py-1 bg-emerald-600 rounded-lg shadow-sm">재등록</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+function reregisterPlayer(id) {
+            const tr = document.getElementById(`released-row-${id}`);
+            if (!tr) return;
+            const newBackNum = parseInt(tr.querySelector('.edit-released-backnum').value);
+            const newType = tr.querySelector('.edit-released-type').value;
+
+            if (isNaN(newBackNum)) return alert('올바른 등번호를 입력해주세요.');
+
+            // 활성 상태인 다른 선수들과 등번호 중복 체크
+            if (globalPlayers.some(item => item.id !== id && item.type !== '방출' && item.backNum === newBackNum)) {
+                return alert(`등번호 ${newBackNum}번은 현재 활성 선수 중 누군가 사용 중입니다.`);
+            }
+
+            const p = globalPlayers.find(item => item.id === id);
+            if (p) {
+                p.backNum = newBackNum;
+                p.type = newType; // 방출 상태 해제 및 선택한 유형으로 변경
+                saveStateToStorage();
+                refreshAppUI();
+                alert(`[${p.name}] 선수가 활성 로스터(${newType})로 재등록되었습니다!`);
+            }
         }
 
         function renderRosterCategoryRows(tbodyId, players) {
@@ -2375,6 +2419,27 @@ function renderPlayerEvalTableContent(s, sIdx, rangeType) {
             saveStateToStorage();
             refreshAppUI();
         }
+
+function saveReleasedPlayerBackNum(id) {
+            const tr = document.getElementById(`released-row-${id}`);
+            if (!tr) return;
+            const newBackNum = parseInt(tr.querySelector('.edit-released-backnum').value);
+            if (isNaN(newBackNum)) return alert('올바른 등번호를 입력해주세요.');
+
+            // 다른 선수들과 등번호 중복 체크 (방출 선수 포함 전체 대상)
+            if (globalPlayers.some(item => item.id !== id && item.backNum === newBackNum)) {
+                return alert(`등번호 ${newBackNum}번은 이미 등록된 번호입니다.`);
+            }
+
+            const p = globalPlayers.find(item => item.id === id);
+            if (p) {
+                p.backNum = newBackNum;
+                saveStateToStorage();
+                refreshAppUI();
+                alert(`[${p.name}] 선수의 등번호가 #${newBackNum}으로 수정되었습니다.`);
+            }
+        }
+
     </script>
 </body>
 </html>
