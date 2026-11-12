@@ -601,13 +601,16 @@
         let injuryOccurrenceCtx = { sIdx: null, targetGameNum: null, injuredPlayerName: null };
 
         // ==================== 데이터 무결성 보정 (방어 함수) ====================
-        function normalizeSeasonsData() {
+function normalizeSeasonsData() {
             if (!Array.isArray(seasons)) seasons = [];
             seasons.forEach(s => {
                 if (!s.gamesData) s.gamesData = {};
                 if (!s.postseasonGames) s.postseasonGames = { ds: {}, cs: {}, ws: {} };
                 if (!s.psSeriesPlayerStatus) s.psSeriesPlayerStatus = { ds: {}, cs: {}, ws: {} };
-                if (!s.seasonEval) s.seasonEval = { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', firstHalfTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' }, fullSeasonTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' }, playerData: {}, firstHalfComments: {}, fullSeasonComments: {} };
+                if (!s.seasonEval) s.seasonEval = { teamRank: '', win: '', loss: '', winRate: '', teamEra: '', teamOps: '', firstHalfTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' }, fullSeasonTeamEval: { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' }, playerData: {}, firstHalfComments: {}, fullSeasonComments: {}, sortState: { firstHalf: { field: null, asc: false }, fullSeason: { field: null, asc: false } }, firstHalfCollapsed: false, fullSeasonCollapsed: false };
+                if (!s.seasonEval.sortState) s.seasonEval.sortState = { firstHalf: { field: null, asc: false }, fullSeason: { field: null, asc: false } };
+                if (s.seasonEval.firstHalfCollapsed === undefined) s.seasonEval.firstHalfCollapsed = false;
+                if (s.seasonEval.fullSeasonCollapsed === undefined) s.seasonEval.fullSeasonCollapsed = false;
                 if (!s.seasonEval.firstHalfTeamEval) s.seasonEval.firstHalfTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
                 if (!s.seasonEval.fullSeasonTeamEval) s.seasonEval.fullSeasonTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
                 if (!s.seasonEval.playerData) s.seasonEval.playerData = {};
@@ -1818,10 +1821,13 @@
             return html;
         }
 
-        function renderSeasonEvalHtml(s, sIdx, players) {
+function renderSeasonEvalHtml(s, sIdx, players) {
             const ev = s.seasonEval || {};
             const fhEval = ev.firstHalfTeamEval || {};
             const fsEval = ev.fullSeasonTeamEval || {};
+            const fhCollapsed = ev.firstHalfCollapsed || false;
+            const fsCollapsed = ev.fullSeasonCollapsed || false;
+
             return `
                 <div class="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl border shadow-sm space-y-6">
                     <h2 class="text-base sm:text-lg font-bold">📊 ${s.name} 시즌 평가</h2>
@@ -1851,7 +1857,16 @@
                         </div>
                     </div>
 
-                    <div class="space-y-3"><h3 class="font-bold text-sm text-brand-600">👤 전반기 선수별 평가 (1G ~ 84G)</h3><div class="overflow-x-auto border rounded-2xl"><table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'firstHalf')}</table></div></div>
+                    <!-- 전반기 선수별 평가 영역 (접기/펼치기 적용) -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center cursor-pointer select-none py-1" onclick="toggleEvalCollapse(${sIdx}, 'firstHalf')">
+                            <h3 class="font-bold text-sm text-brand-600">👤 전반기 선수별 평가 (1G ~ 84G)</h3>
+                            <span class="text-xs text-brand-600 font-semibold px-2 py-1 bg-brand-50 dark:bg-brand-950 rounded-lg">${fhCollapsed ? '펼치기 ▼' : '접기 ▲'}</span>
+                        </div>
+                        <div class="overflow-x-auto border rounded-2xl ${fhCollapsed ? 'hidden' : ''}">
+                            <table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'firstHalf')}</table>
+                        </div>
+                    </div>
                     
                     <!-- 전체 시즌 팀 종합 평가 영역 -->
                     <div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border space-y-4 pt-4">
@@ -1871,23 +1886,64 @@
                         </div>
                     </div>
 
-                    <div class="space-y-3 pt-2"><h3 class="font-bold text-sm text-purple-600">👤 전체 시즌 선수별 평가 (1G ~ 160G)</h3><div class="overflow-x-auto border rounded-2xl"><table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'fullSeason')}</table></div></div>
+                    <!-- 전체 시즌 선수별 평가 영역 (접기/펼치기 적용) -->
+                    <div class="space-y-3 pt-2">
+                        <div class="flex justify-between items-center cursor-pointer select-none py-1" onclick="toggleEvalCollapse(${sIdx}, 'fullSeason')">
+                            <h3 class="font-bold text-sm text-purple-600">👤 전체 시즌 선수별 평가 (1G ~ 160G)</h3>
+                            <span class="text-xs text-purple-600 font-semibold px-2 py-1 bg-purple-50 dark:bg-purple-950 rounded-lg">${fsCollapsed ? '펼치기 ▼' : '접기 ▲'}</span>
+                        </div>
+                        <div class="overflow-x-auto border rounded-2xl ${fsCollapsed ? 'hidden' : ''}">
+                            <table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'fullSeason')}</table>
+                        </div>
+                    </div>
                 </div>
             `;
         }
 
-        function renderPlayerEvalTableContent(s, sIdx, rangeType) {
-            const players = sortMatrixPlayers(getSeasonEffectiveRoster(s).filter(p => p.type !== '방출'));
+function renderPlayerEvalTableContent(s, sIdx, rangeType) {
+            const sortSt = s.seasonEval.sortState?.[rangeType] || { field: null, asc: false };
+            const getIndicator = (f) => {
+                if (sortSt.field !== f) return '';
+                return sortSt.asc ? ' ▲' : ' ▼';
+            };
+
+            let players = sortMatrixPlayers(getSeasonEffectiveRoster(s).filter(p => p.type !== '방출'));
+            
+            // 지표 정렬 로직 적용
+            if (sortSt.field) {
+                let field = sortSt.field;
+                let asc = sortSt.asc;
+                players.sort((a, b) => {
+                    const statKeyA = `${rangeType}_${a.name}`;
+                    const statKeyB = `${rangeType}_${b.name}`;
+                    const valA = parseFloat(s.seasonEval.playerData?.[statKeyA]?.[field]) || 0;
+                    const valB = parseFloat(s.seasonEval.playerData?.[statKeyB]?.[field]) || 0;
+                    if (valA === valB) return 0;
+                    return asc ? (valA - valB) : (valB - valA);
+                });
+            }
+
             let html = `
                 <thead class="bg-slate-50 dark:bg-slate-900 text-slate-500 border-b">
                     <tr>
-                        <th class="p-2.5">선수 정보</th><th class="p-2.5">등록 현황</th>
-                        <th class="p-2.5 text-center">ERA</th><th class="p-2.5 text-center">IP</th><th class="p-2.5 text-center">K</th><th class="p-2.5 text-center">승리</th><th class="p-2.5 text-center">패배</th>
-                        <th class="p-2.5 text-center">홀드</th><th class="p-2.5 text-center">세이브</th><th class="p-2.5 text-center">WHIP</th><th class="p-2.5 text-center">K/9</th><th class="p-2.5 text-center">QS</th><th class="p-2.5 text-center">WAR</th>
+                        <th class="p-2.5 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'name')">선수 정보${sortSt.field === null ? ' ▾' : ''}</th>
+                        <th class="p-2.5">등록 현황</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'era')">ERA${getIndicator('era')}</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'ip')">IP${getIndicator('ip')}</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'k')">K${getIndicator('k')}</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'win')">승리${getIndicator('win')}</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'loss')">패배${getIndicator('loss')}</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'hold')">홀드${getIndicator('hold')}</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'save')">세이브${getIndicator('save')}</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'whip')">WHIP${getIndicator('whip')}</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'k9')">K/9${getIndicator('k9')}</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'qs')">QS${getIndicator('qs')}</th>
+                        <th class="p-2.5 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 select-none" onclick="sortPlayerEval(${sIdx}, '${rangeType}', 'war')">WAR${getIndicator('war')}</th>
                         <th class="p-2.5">코멘트 제목 및 평가</th>
                     </tr>
                 </thead><tbody class="divide-y">
             `;
+            
             players.forEach(p => {
                 const stats = computePlayerStatsSummary(s, p.name, rangeType);
                 const commentData = s.seasonEval[rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments']?.[p.name] || { title: '', body: '' };
@@ -2284,6 +2340,41 @@
         function updateCommentTitle(sIdx, rangeType, playerName, val) { let key = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments'; if (!seasons[sIdx].seasonEval[key][playerName]) seasons[sIdx].seasonEval[key][playerName] = { title: '', body: '' }; seasons[sIdx].seasonEval[key][playerName].title = val; saveStateToStorage(); }
         function updatePsStat(sIdx, statKey, field, val) { if (!seasons[sIdx].psEval.playerData[statKey]) seasons[sIdx].psEval.playerData[statKey] = {}; seasons[sIdx].psEval.playerData[statKey][field] = val; saveStateToStorage(); }
         function updatePsCommentTitle(sIdx, seriesEvalKey, playerName, val) { if (!seasons[sIdx].psEval[seriesEvalKey][playerName]) seasons[sIdx].psEval[seriesEvalKey][playerName] = { title: '', body: '' }; seasons[sIdx].psEval[seriesEvalKey][playerName].title = val; saveStateToStorage(); }
+// 전반기 / 전체 시즌 평가 영역 접기·펼치기 토글
+        function toggleEvalCollapse(sIdx, rangeType) {
+            const season = seasons[sIdx];
+            if (!season.seasonEval) season.seasonEval = {};
+            if (rangeType === 'firstHalf') {
+                season.seasonEval.firstHalfCollapsed = !season.seasonEval.firstHalfCollapsed;
+            } else if (rangeType === 'fullSeason') {
+                season.seasonEval.fullSeasonCollapsed = !season.seasonEval.fullSeasonCollapsed;
+            }
+            saveStateToStorage();
+            refreshAppUI();
+        }
+
+        // 지표 헤더 클릭 시 정렬 기준 변경 (오름차순/내림차순 토글)
+        function sortPlayerEval(sIdx, rangeType, field) {
+            const season = seasons[sIdx];
+            if (!season.seasonEval.sortState) {
+                season.seasonEval.sortState = { firstHalf: { field: null, asc: false }, fullSeason: { field: null, asc: false } };
+            }
+            let st = season.seasonEval.sortState[rangeType];
+            if (field === 'name') {
+                st.field = null;
+                st.asc = false;
+            } else {
+                if (st.field === field) {
+                    st.asc = !st.asc;
+                } else {
+                    st.field = field;
+                    // ERA와 WHIP는 낮을수록 우수하므로 첫 클릭 시 오름차순(asc: true), 그 외 지표는 내림차순(asc: false)
+                    st.asc = (field === 'era' || field === 'whip') ? true : false;
+                }
+            }
+            saveStateToStorage();
+            refreshAppUI();
+        }
     </script>
 </body>
 </html>
