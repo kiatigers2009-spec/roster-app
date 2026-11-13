@@ -3083,9 +3083,9 @@
                 enriched.forEach(({ player: p, stats: st }) => {
                     let mvpHtml = `<span class="text-slate-300">0회</span>`;
                     let mvpParts = [];
-                    if (st.dsMvp > 0) mvpParts.push(`<span class="text-emerald-600 font-bold">DS ${st.dsMvp}회</span>`);
-                    if (st.csMvp > 0) mvpParts.push(`<span class="text-amber-600 font-bold">CS ${st.csMvp}회</span>`);
-                    if (st.wsMvp > 0) mvpParts.push(`<span class="text-purple-600 font-bold">WS ${st.wsMvp}회</span>`);
+                    if (st.dsMvp > 0) mvpParts.push(`<span class="text-emerald-600 font-bold">🏅 DS ${st.dsMvp}회</span>`);
+                    if (st.csMvp > 0) mvpParts.push(`<span class="text-amber-600 font-bold">🏅 CS ${st.csMvp}회</span>`);
+                    if (st.wsMvp > 0) mvpParts.push(`<span class="text-purple-600 font-bold">🏅 WS ${st.wsMvp}회</span>`);
                     
                     if (mvpParts.length > 0) {
                         mvpHtml = `<div class="flex flex-col space-y-0.5">${mvpParts.join('')}</div>`;
@@ -3702,7 +3702,7 @@ function updateTeamRecordName(recId, newName) {
         saveStateToStorage();
     }
 }
-
+ 
 let isPerSeasonAverageMode = false;
 
 function togglePerSeasonAverage() {
