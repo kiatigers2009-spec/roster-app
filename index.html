@@ -3445,21 +3445,26 @@
             
             const grandTimeline = getGrandMasterTimeline(); 
             let targetIdx = grandTimeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum);
+            
+            // 경계값 방어
+            if (targetIdx === -1) return;
 
             let returningPlayer = null;
-            players.forEach(p => {
-                if (returningPlayer) return;
+            // forEach 대신 for...of를 사용하여 안전하게 순회 및 중단 처리
+            for (const p of players) {
                 const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name);
                 let curIdx = timeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum);
                 let prevIdx = timeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum - 1);
+                
                 if (curIdx !== -1 && prevIdx !== -1) {
                     let prevSt = statusMap[prevIdx]?.status;
                     let curSt = statusMap[curIdx]?.status;
                     if (prevSt && (prevSt.includes('부상') || prevSt === '시즌아웃' || prevSt === '토미존') && !curSt) {
                         returningPlayer = p.name;
+                        break;
                     }
                 }
-            });
+            }
 
             if (returningPlayer) {
                 openInjuryReturnModal(sIdx, targetGameNum, returningPlayer);
@@ -3467,7 +3472,7 @@
             }
 
             let majorCandidates = [];
-            players.forEach(p => {
+            for (const p of players) {
                 const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name);
                 let prevIdx = timeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum - 1);
                 let curIdx = timeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum);
@@ -3478,7 +3483,7 @@
                         majorCandidates.push(p.name);
                     }
                 }
-            });
+            }
 
             let newlyInjuredPlayer = null;
             if (majorCandidates.length > 0 && Math.random() < 0.025) {
@@ -3493,7 +3498,7 @@
                 ];
                 let totalWeight = injuryOptions.reduce((sum, item) => sum + item.weight, 0);
                 let r = Math.random() * totalWeight;
-                let chosenInjury = '부상 15일';
+                let chosenInjury = '부상 15일'; // 기본값(Fallback) 설정
                 for (let opt of injuryOptions) {
                     if (r < opt.weight) {
                         chosenInjury = opt.label;
