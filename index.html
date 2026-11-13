@@ -381,6 +381,13 @@
                         <label class="flex items-center space-x-1.5 cursor-pointer"><input type="checkbox" checked onchange="toggleRecordFilter('player', 'type', '현역', this.checked)" class="rounded text-brand-600"><span>현역</span></label>
                         <label class="flex items-center space-x-1.5 cursor-pointer"><input type="checkbox" checked onchange="toggleRecordFilter('player', 'type', '공통 선수', this.checked)" class="rounded text-brand-600"><span>공통 선수</span></label>
                     </div>
+
+                    <div class="flex items-center justify-between pt-2 border-t">
+                        <span class="text-xs text-slate-500">누적 스탯을 소화 시즌 횟수로 나눈 평균값으로 환산합니다.</span>
+                        <button onclick="togglePerSeasonAverage()" id="perSeasonAvgBtn" class="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 transition">
+                            시즌당 평균 계산: 끄기
+                        </button>
+                    </div>
                 </div>
                 <div class="overflow-x-auto custom-scrollbar border rounded-2xl">
                     <table class="w-full text-xs text-center border-collapse" id="playerRecordsTable"></table>
@@ -479,6 +486,14 @@
                 <div class="col-span-2">
                     <label class="block font-semibold text-slate-500 mb-1">시즌 명칭</label>
                     <input type="text" id="newTeamRecSeason" placeholder="예: 2024 시즌" class="w-full border rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-900 font-bold">
+                </div>
+                <!-- [추가] 팀 구분 선택 필드 -->
+                <div class="col-span-2">
+                    <label class="block font-semibold text-slate-500 mb-1">팀 구분</label>
+                    <select id="newTeamRecTeamType" class="w-full border rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-900 font-bold">
+                        <option value="1팀">1팀</option>
+                        <option value="2팀">2팀</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block font-semibold text-slate-500 mb-1">최종 순위</label>
@@ -2558,10 +2573,11 @@
         // 특정 선수의 정규시즌 통산 누적 계산 (시즌평가 반영분 + 이전 기록 보관분)
         function calculateCumulativeRegStats(playerName) {
             let totalOuts = 0;
-            let weightedEr = 0;   // ERA * 실제이닝
-            let weightedWhip = 0; // WHIP * 실제이닝
+            let weightedEr = 0;
+            let weightedWhip = 0;
             let totalK = 0, totalWin = 0, totalLoss = 0, totalHold = 0, totalSave = 0, totalQs = 0;
             let totalWar = 0;
+            let seasonCount = 0; // [추가] 소화 시즌 수 카운트
 
             const addSeasonEntry = (st, isLegacy = false) => {
                 if (!st) return;
@@ -2581,19 +2597,24 @@
                 totalHold += parseInt(st.hold, 10) || 0;
                 totalSave += parseInt(st.save, 10) || 0;
                 totalQs += parseInt(st.qs, 10) || 0;
-                if (!isLegacy) {
-                    totalWar += parseFloat(st.war) || 0;
-                }
+                totalWar += parseFloat(st.war) || 0;    
             };
 
             // 1. 각 시즌 반영 데이터 합산
-            Object.values(recordsArchive.playerSeasons || {}).forEach(sMap => {
-                if (sMap && sMap[playerName]) addSeasonEntry(sMap[playerName], false);
+
+            Object.entries(recordsArchive.playerSeasons || {}).forEach(([sId, sMap]) => {
+                if (sMap && sMap[playerName]) {
+                    addSeasonEntry(sMap[playerName], false);
+                    seasonCount++; // [추가] 기록이 존재하는 시즌 수 누적
+                }
             });
 
             // 2. 이전 기록 보관 데이터 합산 (WAR은 0 처리)
             const legacyReg = recordsArchive.legacyRecords?.[playerName]?.reg;
-            if (legacyReg) addSeasonEntry(legacyReg, true);
+            if (legacyReg) {
+                addSeasonEntry(legacyReg);
+                seasonCount += parseInt(legacyReg.seasons, 10) || 0;
+            }
 
             const totalRealIp = totalOuts / 3;
             const finalEra = totalRealIp > 0 ? (weightedEr / totalRealIp).toFixed(2) : '-';
@@ -2602,6 +2623,7 @@
 
             return {
                 hasRecord: totalOuts > 0 || totalWin > 0 || totalLoss > 0 || totalHold > 0 || totalSave > 0 || totalK > 0,
+                seasonCount, // [추가] 반환 객체에 시즌 수 포함
                 outs: totalOuts,
                 ipStr: outsToIpStr(totalOuts),
                 era: finalEra,
@@ -2626,7 +2648,9 @@
             let totalOuts = 0;
             let weightedEr = 0;
             let totalK = 0, totalWin = 0, totalLoss = 0, totalHold = 0, totalSave = 0;
-            let mvpCount = 0;
+            let dsMvpCount = 0;
+            let csMvpCount = 0;
+            let wsMvpCount = 0;
 
             const addPsEntry = (st) => {
                 if (!st) return;
@@ -2645,33 +2669,54 @@
                 totalSave += parseInt(st.save, 10) || 0;
             };
 
-            // 1. 각 시즌 PS 반영 데이터 합산
+            // 1. 각 시즌 PS 평가 반영 데이터 및 PS 시즌별 MVP 합산
             Object.values(recordsArchive.psSeasons || {}).forEach(sObj => {
-                selectedSeriesList.forEach(ser => {
-                    if (sObj?.[ser]?.players?.[playerName]) {
-                        addPsEntry(sObj[ser].players[playerName]);
-                    }
-                    if (sObj?.[ser]?.mvp === playerName) {
-                        mvpCount++;
-                    }
-                });
+                if (selectedSeriesList.includes('ds')) {
+                    if (sObj?.ds?.players?.[playerName]) addPsEntry(sObj.ds.players[playerName]);
+                    if (sObj?.ds?.mvp === playerName) dsMvpCount++;
+                }
+                if (selectedSeriesList.includes('cs')) {
+                    if (sObj?.cs?.players?.[playerName]) addPsEntry(sObj.cs.players[playerName]);
+                    if (sObj?.cs?.mvp === playerName) csMvpCount++;
+                }
+                if (selectedSeriesList.includes('ws')) {
+                    if (sObj?.ws?.players?.[playerName]) addPsEntry(sObj.ws.players[playerName]);
+                    if (sObj?.ws?.mvp === playerName) wsMvpCount++;
+                }
             });
 
-            // 2. 이전 기록 보관 PS 데이터 합산 (DS, CS)
+            // 2. 새롭게 진행 중인 시즌의 PS 평가(psEval) 데이터에서 직접 선정된 MVP 즉시 반영 합산
+            seasons.forEach(s => {
+                const psEval = s.psEval;
+                if (psEval) {
+                    if (selectedSeriesList.includes('ds') && psEval.dsTeamEval?.mvp === playerName) dsMvpCount++;
+                    if (selectedSeriesList.includes('cs') && psEval.csTeamEval?.mvp === playerName) csMvpCount++;
+                    if (selectedSeriesList.includes('ws') && psEval.wsTeamEval?.mvp === playerName) wsMvpCount++;
+                }
+            });
+ 
+            // 3. 이전 기록 보관(legacyRecords) PS 데이터 및 MVP 합산
             const legacyObj = recordsArchive.legacyRecords?.[playerName];
             if (legacyObj) {
-                selectedSeriesList.forEach(ser => {
-                    if ((ser === 'ds' || ser === 'cs') && legacyObj[ser]) {
-                        addPsEntry(legacyObj[ser]);
-                    }
-                });
+                if (selectedSeriesList.includes('ds') && legacyObj.ds) {
+                    addPsEntry(legacyObj.ds);
+                    if (legacyObj.ds.mvp) dsMvpCount += parseInt(legacyObj.ds.mvp, 10) || 0;
+                }
+                if (selectedSeriesList.includes('cs') && legacyObj.cs) {
+                    addPsEntry(legacyObj.cs);
+                    if (legacyObj.cs.mvp) csMvpCount += parseInt(legacyObj.cs.mvp, 10) || 0;
+                }
+                if (selectedSeriesList.includes('ws') && legacyObj.ws) {
+                    addPsEntry(legacyObj.ws);
+                    if (legacyObj.ws.mvp) wsMvpCount += parseInt(legacyObj.ws.mvp, 10) || 0;
+                }
             }
 
             const totalRealIp = totalOuts / 3;
             const finalEra = totalRealIp > 0 ? (weightedEr / totalRealIp).toFixed(2) : '-';
 
             return {
-                hasRecord: totalOuts > 0 || totalWin > 0 || totalLoss > 0 || totalHold > 0 || totalSave > 0 || totalK > 0 || mvpCount > 0,
+                hasRecord: totalOuts > 0 || totalWin > 0 || totalLoss > 0 || totalHold > 0 || totalSave > 0 || totalK > 0 || dsMvpCount > 0 || csMvpCount > 0 || wsMvpCount > 0,
                 outs: totalOuts,
                 ipStr: outsToIpStr(totalOuts),
                 era: finalEra,
@@ -2681,7 +2726,9 @@
                 loss: totalLoss,
                 hold: totalHold,
                 save: totalSave,
-                mvp: mvpCount
+                dsMvp: dsMvpCount,
+                csMvp: csMvpCount,
+                wsMvp: wsMvpCount
             };
         }
 
@@ -2805,7 +2852,10 @@
 
                     html += `
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/40">
-                            <td class="p-3 text-left pl-4 font-bold">${r.seasonName}</td>
+                            <td class="p-3 text-left pl-4 font-bold flex items-center space-x-2">
+                                <input type="text" value="${r.seasonName}" onchange="updateTeamRecordName('${r.id}', this.value)" class="w-32 border rounded px-2 py-1 text-xs font-bold bg-transparent">
+                                <span class="text-[10px] px-1.5 py-0.5 rounded ${r.teamType === '2팀' ? 'bg-amber-100 text-amber-700' : 'bg-brand-100 text-brand-700'}">${r.teamType || '1팀'}</span>
+                            </td>
                             <td class="p-3 font-bold text-brand-600">${r.rank}</td>
                             <td class="p-3 font-semibold">${r.winLoss}</td>
                             <td class="p-3 font-mono">${r.winRate}</td>
@@ -2839,10 +2889,13 @@
         function saveNewTeamRecordModal() {
             const seasonName = document.getElementById('newTeamRecSeason').value.trim();
             if (!seasonName) return alert('시즌 명칭을 입력해주세요.');
+            const teamType = document.getElementById('newTeamRecTeamType').value; // [추가]
             const manualId = `manual_${Date.now()}`;
+ 
             recordsArchive.teamRecords[manualId] = {
                 id: manualId,
                 seasonName,
+                teamType, // [추가] 데이터에 팀 구분 저장
                 rank: document.getElementById('newTeamRecRank').value.trim() || '-',
                 winLoss: document.getElementById('newTeamRecWinLoss').value.trim() || '-',
                 winRate: document.getElementById('newTeamRecWinRate').value.trim() || '-',
@@ -2909,7 +2962,8 @@
             let html = `
                 <thead class="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-b font-bold">
                     <tr>
-                        <th class="p-3 text-left pl-4 sticky-col bg-slate-50 dark:bg-slate-900 min-w-[140px]">선수 정보</th>
+                        <th class="p-3 text-left pl-4 sticky-col bg-slate-50 dark:bg-slate-900 min-w-[140px] cursor-pointer hover:bg-slate-100" onclick="resetRecordSort('player')">선수 정보 🔄</th>
+                        <th class="p-3">시즌</th>
                         <th class="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onclick="sortRecordsTable('player', 'era')">ERA${getInd('era')}</th>
                         <th class="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onclick="sortRecordsTable('player', 'ip')">IP${getInd('ip')}</th>
                         <th class="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onclick="sortRecordsTable('player', 'k')">K${getInd('k')}</th>
@@ -2930,6 +2984,16 @@
                 html += `<tr><td colspan="12" class="p-6 text-slate-400">선택된 필터 조건에 해당하는 선수가 없습니다.</td></tr>`;
             } else {
                 enriched.forEach(({ player: p, stats: st }) => {
+
+                    let sc = st.seasonCount > 0 ? st.seasonCount : 1;
+                    // 👈 토글 켜짐 여부에 따라 시즌 수로 나눈 평균값으로 환산
+                    let displayK = isPerSeasonAverageMode ? (st.k / sc).toFixed(2) : st.k;
+                    let displayWin = isPerSeasonAverageMode ? (st.win / sc).toFixed(2) : st.win;
+                    let displayLoss = isPerSeasonAverageMode ? (st.loss / sc).toFixed(2) : st.loss;
+                    let displayHold = isPerSeasonAverageMode ? (st.hold / sc).toFixed(2) : st.hold;
+                    let displaySave = isPerSeasonAverageMode ? (st.save / sc).toFixed(2) : st.save;
+                    let displayQs = isPerSeasonAverageMode ? (st.qs / sc).toFixed(2) : st.qs;
+
                     html += `
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/40">
                             <td class="p-2.5 text-left pl-4 sticky-col bg-white dark:bg-slate-800 border-r">
@@ -2939,16 +3003,17 @@
                                 </div>
                                 <div class="text-[10px] text-slate-400">#${p.backNum} · ${p.position} (${p.hand})</div>
                             </td>
+                            <td class="p-2.5 font-semibold text-slate-600 dark:text-slate-300">${st.seasonCount}시즌</td>
                             <td class="p-2.5 font-mono font-bold text-brand-600">${st.era}</td>
                             <td class="p-2.5 font-mono font-semibold">${st.ipStr}</td>
-                            <td class="p-2.5 font-mono">${st.k}</td>
-                            <td class="p-2.5 font-mono text-blue-600 font-bold">${st.win}</td>
-                            <td class="p-2.5 font-mono text-rose-600">${st.loss}</td>
-                            <td class="p-2.5 font-mono">${st.hold}</td>
-                            <td class="p-2.5 font-mono">${st.save}</td>
+                            <td class="p-2.5 font-mono">${displayK}</td>
+                            <td class="p-2.5 font-mono text-blue-600 font-bold">${displayWin}</td>
+                            <td class="p-2.5 font-mono text-rose-600">${displayLoss}</td>
+                            <td class="p-2.5 font-mono">${displayHold}</td>
+                            <td class="p-2.5 font-mono">${displaySave}</td>
                             <td class="p-2.5 font-mono">${st.whip}</td>
                             <td class="p-2.5 font-mono">${st.k9}</td>
-                            <td class="p-2.5 font-mono">${st.qs}</td>
+                            <td class="p-2.5 font-mono">${displayQs}</td>
                             <td class="p-2.5 font-mono font-bold text-purple-600">${st.war}</td>
                         </tr>
                     `;
@@ -2977,7 +3042,7 @@
             let enriched = list.map(p => ({
                 player: p,
                 stats: calculateCumulativePsStats(p.name, filters.series)
-            }));
+            })).filter(item => item.stats.hasRecord);
 
             if (sortSt.field) {
                 const f = sortSt.field;
@@ -2996,9 +3061,9 @@
             }
 
             let html = `
-                <thead class="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-b font-bold">
+                <thead class="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-b font-bold text-xs">
                     <tr>
-                        <th class="p-3 text-left pl-4 sticky-col bg-slate-50 dark:bg-slate-900 min-w-[140px]">선수 정보</th>
+                        <th class="p-3 text-left pl-4 sticky-col bg-slate-50 dark:bg-slate-900 min-w-[140px] cursor-pointer hover:bg-slate-100" onclick="resetRecordSort('player')">선수 정보 🔄</th>
                         <th class="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onclick="sortRecordsTable('ps', 'era')">ERA${getInd('era')}</th>
                         <th class="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onclick="sortRecordsTable('ps', 'ip')">IP${getInd('ip')}</th>
                         <th class="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onclick="sortRecordsTable('ps', 'k')">K${getInd('k')}</th>
@@ -3006,17 +3071,26 @@
                         <th class="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onclick="sortRecordsTable('ps', 'loss')">패배${getInd('loss')}</th>
                         <th class="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onclick="sortRecordsTable('ps', 'hold')">홀드${getInd('hold')}</th>
                         <th class="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onclick="sortRecordsTable('ps', 'save')">세이브${getInd('save')}</th>
-                        <th class="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-amber-600" onclick="sortRecordsTable('ps', 'mvp')">시리즈 MVP${getInd('mvp')}</th>
+                        <th class="p-3 text-amber-600">시리즈 MVP</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y">
+                <tbody class="divide-y text-xs">
             `;
 
             if (enriched.length === 0) {
                 html += `<tr><td colspan="9" class="p-6 text-slate-400">선택된 필터 조건에 해당하는 선수가 없습니다.</td></tr>`;
             } else {
                 enriched.forEach(({ player: p, stats: st }) => {
-                    const mvpBadge = st.mvp > 0 ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-bold">🏅 ${st.mvp}회</span>` : `<span class="text-slate-300">0</span>`;
+                    let mvpHtml = `<span class="text-slate-300">0회</span>`;
+                    let mvpParts = [];
+                    if (st.dsMvp > 0) mvpParts.push(`<span class="text-emerald-600 font-bold">DS ${st.dsMvp}회</span>`);
+                    if (st.csMvp > 0) mvpParts.push(`<span class="text-amber-600 font-bold">CS ${st.csMvp}회</span>`);
+                    if (st.wsMvp > 0) mvpParts.push(`<span class="text-purple-600 font-bold">WS ${st.wsMvp}회</span>`);
+                    
+                    if (mvpParts.length > 0) {
+                        mvpHtml = `<div class="flex flex-col space-y-0.5">${mvpParts.join('')}</div>`;
+                    }
+
                     html += `
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/40">
                             <td class="p-2.5 text-left pl-4 sticky-col bg-white dark:bg-slate-800 border-r">
@@ -3033,7 +3107,7 @@
                             <td class="p-2.5 font-mono text-rose-600">${st.loss}</td>
                             <td class="p-2.5 font-mono">${st.hold}</td>
                             <td class="p-2.5 font-mono">${st.save}</td>
-                            <td class="p-2.5">${mvpBadge}</td>
+                            <td class="p-2.5">${mvpHtml}</td>
                         </tr>
                     `;
                 });
@@ -3052,10 +3126,11 @@
             if (countBadge) countBadge.textContent = `총 ${releasedList.length}명`;
 
             let html = `
-                <thead class="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-b font-bold">
+                <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-b font-bold text-xs">
                     <tr>
                         <th class="p-3 text-left pl-4 min-w-[130px] border-r">방출 선수</th>
                         <th class="p-3 w-20">구분</th>
+                        <th class="p-3">시즌</th>
                         <th class="p-3">ERA</th>
                         <th class="p-3">IP</th>
                         <th class="p-3">K</th>
@@ -3066,26 +3141,41 @@
                         <th class="p-3">WHIP</th>
                         <th class="p-3">K/9</th>
                         <th class="p-3">QS</th>
-                        <th class="p-3">WAR / MVP</th>
+                        <th class="p-3">성과 / MVP</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y">
+                <tbody class="divide-y text-xs">
             `;
 
             if (releasedList.length === 0) {
-                html += `<tr><td colspan="13" class="p-6 text-slate-400">방출된 선수가 없습니다.</td></tr>`;
+                html += `<tr><td colspan="14" class="p-6 text-slate-400">방출된 선수가 없습니다.</td></tr>`;
             } else {
                 releasedList.forEach(p => {
                     const reg = calculateCumulativeRegStats(p.name);
-                    const ps = calculateCumulativePsStats(p.name, ['ds', 'cs', 'ws']);
+                    
+                    // DS, CS, WS 모든 시리즈를 포함하여 통산 포스트시즌 기록 합산 계산
+                    const psAll = calculateCumulativePsStats(p.name, ['ds', 'cs', 'ws']);
+                    
+                    const legacyReg = recordsArchive.legacyRecords?.[p.name]?.reg || {};
+                    const legacySeasons = parseInt(legacyReg.seasons, 10) || 0;
+                    const totalSeasons = reg.seasonCount + legacySeasons;
+
+                    // 포스트시즌 MVP 합산 표기 문자열 조합
+                    let mvpSummaryParts = [];
+                    if (psAll.dsMvp > 0) mvpSummaryParts.push(`DS ${psAll.dsMvp}회`);
+                    if (psAll.csMvp > 0) mvpSummaryParts.push(`CS ${psAll.csMvp}회`);
+                    if (psAll.wsMvp > 0) mvpSummaryParts.push(`WS ${psAll.wsMvp}회`);
+                    let psMvpStr = mvpSummaryParts.length > 0 ? mvpSummaryParts.join(', ') : '0회';
 
                     html += `
+                        <!-- 정규시즌 행 -->
                         <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-700/30">
                             <td rowspan="2" class="p-3 text-left pl-4 font-bold border-r bg-slate-50/40 dark:bg-slate-900/40 align-middle">
                                 <div class="text-sm text-slate-700 dark:text-slate-200">${p.name}</div>
                                 <div class="text-[10px] text-slate-400 font-normal mt-0.5">#${p.backNum} · ${p.position} (${p.hand})</div>
                             </td>
                             <td class="p-2 font-bold text-[11px] text-blue-600 bg-blue-50/40 dark:bg-blue-950/30">정규시즌</td>
+                            <td class="p-2 font-semibold">${totalSeasons}시즌</td>
                             <td class="p-2 font-mono font-bold">${reg.era}</td>
                             <td class="p-2 font-mono">${reg.ipStr}</td>
                             <td class="p-2 font-mono">${reg.k}</td>
@@ -3096,21 +3186,21 @@
                             <td class="p-2 font-mono">${reg.whip}</td>
                             <td class="p-2 font-mono">${reg.k9}</td>
                             <td class="p-2 font-mono">${reg.qs}</td>
-                            <td class="p-2 font-mono font-bold text-purple-600">WAR ${reg.war}</td>
+                            <td class="p-2 font-bold text-purple-600">WAR ${reg.war}</td>
                         </tr>
+                        <!-- 포스트시즌 통합 합산 행 -->
                         <tr class="border-b-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50/70 dark:hover:bg-slate-700/30">
-                            <td class="p-2 font-bold text-[11px] text-amber-600 bg-amber-50/40 dark:bg-amber-950/30">포스트시즌</td>
-                            <td class="p-2 font-mono font-bold">${ps.era}</td>
-                            <td class="p-2 font-mono">${ps.ipStr}</td>
-                            <td class="p-2 font-mono">${ps.k}</td>
-                            <td class="p-2 font-mono text-blue-600 font-bold">${ps.win}</td>
-                            <td class="p-2 font-mono text-rose-600">${ps.loss}</td>
-                            <td class="p-2 font-mono">${ps.hold}</td>
-                            <td class="p-2 font-mono">${ps.save}</td>
-                            <td class="p-2 text-slate-300">-</td>
-                            <td class="p-2 text-slate-300">-</td>
-                            <td class="p-2 text-slate-300">-</td>
-                            <td class="p-2 font-bold text-amber-600">MVP ${ps.mvp}회</td>
+                            <td class="p-2 font-bold text-[11px] text-emerald-600 bg-emerald-50/40 dark:bg-emerald-950/30">포스트시즌</td>
+                            <td class="p-2 text-slate-400">-</td>
+                            <td class="p-2 font-mono font-bold">${psAll.era}</td>
+                            <td class="p-2 font-mono">${psAll.ipStr}</td>
+                            <td class="p-2 font-mono">${psAll.k}</td>
+                            <td class="p-2 font-mono text-blue-600 font-bold">${psAll.win}</td>
+                            <td class="p-2 font-mono text-rose-600">${psAll.loss}</td>
+                            <td class="p-2 font-mono">${psAll.hold}</td>
+                            <td class="p-2 font-mono">${psAll.save}</td>
+                            <td colspan="3" class="text-slate-300">-</td>
+                            <td class="p-2 font-bold text-amber-600">MVP ${psMvpStr}</td>
                         </tr>
                     `;
                 });
@@ -3121,94 +3211,100 @@
 
         // 5. 이전 기록 보관 테이블 렌더링 (전체 선수: 활성 + 방출 모두 포함, WAR 제외, PS는 DS/CS만)
         function renderLegacyRecordsTable() {
-            const table = document.getElementById('legacyRecordsTable');
-            if (!table) return;
+    const table = document.getElementById('legacyRecordsTable');
+    if (!table) return;
 
-            const activeSorted = sortMatrixPlayers(globalPlayers.filter(p => p.type !== '방출'));
-            const releasedList = globalPlayers.filter(p => p.type === '방출');
-            const allPlayersList = [...activeSorted, ...releasedList];
+    const activeSorted = sortMatrixPlayers(globalPlayers.filter(p => p.type !== '방출'));
+    const releasedList = globalPlayers.filter(p => p.type === '방출');
+    const allPlayersList = [...activeSorted, ...releasedList];
 
-            let html = `
-                <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 sticky top-0 z-20 border-b font-bold">
-                    <tr>
-                        <th rowspan="2" class="p-2.5 text-left pl-4 sticky-col bg-slate-100 dark:bg-slate-900 border-r min-w-[130px]">선수 정보</th>
-                        <th colspan="10" class="p-2 bg-blue-50/80 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-r">과거 정규시즌 누적 (WAR 자동 0 처리)</th>
-                        <th colspan="7" class="p-2 bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-r">디비전 시리즈 (DS)</th>
-                        <th colspan="7" class="p-2 bg-amber-50/80 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300">챔피언십 시리즈 (CS)</th>
-                    </tr>
-                    <tr class="text-[11px]">
-                        <!-- 정규시즌 10개 지표 -->
-                        <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">ERA</th>
-                        <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">IP</th>
-                        <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">K</th>
-                        <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">승</th>
-                        <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">패</th>
-                        <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">홀드</th>
-                        <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">세이브</th>
-                        <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">WHIP</th>
-                        <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">K/9</th>
-                        <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30 border-r">QS</th>
-                        <!-- DS 7개 지표 -->
-                        <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">ERA</th>
-                        <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">IP</th>
-                        <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">K</th>
-                        <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">승</th>
-                        <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">패</th>
-                        <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">홀드</th>
-                        <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30 border-r">세이브</th>
-                        <!-- CS 7개 지표 -->
-                        <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">ERA</th>
-                        <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">IP</th>
-                        <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">K</th>
-                        <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">승</th>
-                        <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">패</th>
-                        <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">홀드</th>
-                        <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">세이브</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y">
-            `;
+    let html = `
+        <thead class="bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 sticky top-0 z-20 border-b font-bold">
+            <tr>
+                <th rowspan="2" class="p-2.5 text-left pl-4 sticky-col bg-slate-100 dark:bg-slate-900 border-r min-w-[130px]">선수 정보</th>
+                <th colspan="12" class="p-2 bg-blue-50/80 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-r">과거 정규시즌 통산 누적</th>
+                <th colspan="8" class="p-2 bg-emerald-50/80 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-r">디비전 시리즈 (DS)</th>
+                <th colspan="8" class="p-2 bg-amber-50/80 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300">챔피언십 시리즈 (CS)</th>
+            </tr>
+            <tr class="text-[11px]">
+                <!-- 정규시즌 12개 지표 (시즌, ERA, IP, K, 승, 패, 홀드, 세이브, WHIP, K/9, QS, WAR) -->
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">시즌</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">ERA</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">IP</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">K</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">승</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">패</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">홀드</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">세이브</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">WHIP</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">K/9</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30">QS</th>
+                <th class="p-1.5 bg-blue-50/40 dark:bg-blue-950/30 border-r">WAR</th>
+                
+                <!-- DS 8개 지표 (ERA, IP, K, 승, 패, 홀드, 세이브, MVP) -->
+                <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">ERA</th>
+                <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">IP</th>
+                <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">K</th>
+                <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">승</th>
+                <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">패</th>
+                <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">홀드</th>
+                <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30">세이브</th>
+                <th class="p-1.5 bg-emerald-50/40 dark:bg-emerald-950/30 border-r">MVP</th>
+                
+                <!-- CS 8개 지표 (ERA, IP, K, 승, 패, 홀드, 세이브, MVP) -->
+                <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">ERA</th>
+                <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">IP</th>
+                <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">K</th>
+                <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">승</th>
+                <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">패</th>
+                <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">홀드</th>
+                <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">세이브</th>
+                <th class="p-1.5 bg-amber-50/40 dark:bg-amber-950/30">MVP</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+    `;
 
-            const regFields = ['era', 'ip', 'k', 'win', 'loss', 'hold', 'save', 'whip', 'k9', 'qs'];
-            const psFields = ['era', 'ip', 'k', 'win', 'loss', 'hold', 'save'];
+    const regFields = ['seasons', 'era', 'ip', 'k', 'win', 'loss', 'hold', 'save', 'whip', 'k9', 'qs', 'war'];
+    const psFields = ['era', 'ip', 'k', 'win', 'loss', 'hold', 'save', 'mvp'];
 
-            allPlayersList.forEach(p => {
-                const leg = recordsArchive.legacyRecords?.[p.name] || { reg: {}, ds: {}, cs: {} };
-                const reg = leg.reg || {};
-                const ds = leg.ds || {};
-                const cs = leg.cs || {};
+    allPlayersList.forEach(p => {
+        const leg = recordsArchive.legacyRecords?.[p.name] || { reg: {}, ds: {}, cs: {} };
+        const reg = leg.reg || {};
+        const ds = leg.ds || {};
+        const cs = leg.cs || {};
 
-                html += `
-                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td class="p-2 text-left pl-4 sticky-col bg-white dark:bg-slate-800 border-r">
-                            <div class="font-bold flex items-center space-x-1">
-                                <span>${p.name}</span>
-                                ${p.type === '방출' ? getTypeBadgeHtml('방출') : ''}
-                            </div>
-                            <div class="text-[9px] text-slate-400">${p.position} (${p.hand})</div>
-                        </td>
-                `;
+        html += `
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                <td class="p-2 text-left pl-4 sticky-col bg-white dark:bg-slate-800 border-r">
+                    <div class="font-bold flex items-center space-x-1">
+                        <span>${p.name}</span>
+                        ${p.type === '방출' ? getTypeBadgeHtml('방출') : ''}
+                    </div>
+                    <div class="text-[9px] text-slate-400">${p.position} (${p.hand})</div>
+                </td>
+        `;
 
-                regFields.forEach((f, i) => {
-                    const borderR = i === regFields.length - 1 ? 'border-r' : '';
-                    html += `<td class="p-1 ${borderR}"><input type="text" value="${reg[f] || ''}" onchange="updateLegacyRecordField('${p.name}', 'reg', '${f}', this.value)" class="w-11 border rounded px-1 py-1 text-center text-[11px] bg-transparent"></td>`;
-                });
+        regFields.forEach((f, i) => {
+            const borderR = i === regFields.length - 1 ? 'border-r' : '';
+            html += `<td class="p-1 ${borderR}"><input type="text" value="${reg[f] || ''}" onchange="updateLegacyRecordField('${p.name}', 'reg', '${f}', this.value)" class="w-11 border rounded px-1 py-1 text-center text-[11px] bg-transparent"></td>`;
+        });
 
-                psFields.forEach((f, i) => {
-                    const borderR = i === psFields.length - 1 ? 'border-r' : '';
-                    html += `<td class="p-1 ${borderR}"><input type="text" value="${ds[f] || ''}" onchange="updateLegacyRecordField('${p.name}', 'ds', '${f}', this.value)" class="w-11 border rounded px-1 py-1 text-center text-[11px] bg-transparent"></td>`;
-                });
+        psFields.forEach((f, i) => {
+            const borderR = i === psFields.length - 1 ? 'border-r' : '';
+            html += `<td class="p-1 ${borderR}"><input type="text" value="${ds[f] || ''}" onchange="updateLegacyRecordField('${p.name}', 'ds', '${f}', this.value)" class="w-11 border rounded px-1 py-1 text-center text-[11px] bg-transparent"></td>`;
+        });
 
-                psFields.forEach((f) => {
-                    html += `<td class="p-1"><input type="text" value="${cs[f] || ''}" onchange="updateLegacyRecordField('${p.name}', 'cs', '${f}', this.value)" class="w-11 border rounded px-1 py-1 text-center text-[11px] bg-transparent"></td>`;
-                });
+        psFields.forEach((f) => {
+            html += `<td class="p-1"><input type="text" value="${cs[f] || ''}" onchange="updateLegacyRecordField('${p.name}', 'cs', '${f}', this.value)" class="w-11 border rounded px-1 py-1 text-center text-[11px] bg-transparent"></td>`;
+        });
 
-                html += `</tr>`;
-            });
+        html += `</tr>`;
+    });
 
-            html += `</tbody>`;
-            table.innerHTML = html;
-        }
+    html += `</tbody>`;
+    table.innerHTML = html;
+}
 
         function updateLegacyRecordField(playerName, section, field, val) {
             if (!recordsArchive.legacyRecords[playerName]) {
@@ -3599,6 +3695,40 @@
         window.deleteTeamRecord = deleteTeamRecord;
         window.updateLegacyRecordField = updateLegacyRecordField;
         window.applyLegacyRecordsToArchive = applyLegacyRecordsToArchive;
+
+function updateTeamRecordName(recId, newName) {
+    if (recordsArchive.teamRecords[recId]) {
+        recordsArchive.teamRecords[recId].seasonName = newName.trim();
+        saveStateToStorage();
+    }
+}
+
+let isPerSeasonAverageMode = false;
+
+function togglePerSeasonAverage() {
+    isPerSeasonAverageMode = !isPerSeasonAverageMode;
+    const btn = document.getElementById('perSeasonAvgBtn');
+    if (btn) {
+        btn.className = isPerSeasonAverageMode 
+            ? "px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-brand-600 text-white shadow-sm transition" 
+            : "px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 transition";
+        btn.textContent = `시즌당 평균 계산: ${isPerSeasonAverageMode ? '켜기' : '끄기'}`;
+    }
+    renderPlayerRecordsTable();
+}
+
+function resetRecordSort(tabKey) {
+    recSortState[tabKey] = { field: null, asc: false };
+    renderRecordsViews();
+}
+
+function updateTeamRecordName(recId, newName) {
+    if (recordsArchive.teamRecords[recId]) {
+        recordsArchive.teamRecords[recId].seasonName = newName.trim();
+        saveStateToStorage();
+    }
+}
+
     </script>
 </body>
 </html>
