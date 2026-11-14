@@ -1043,7 +1043,9 @@
             const teamChoice = prompt('이 시즌에서 사용할 로스터 팀을 선택하세요 (1 또는 2 입력):\n1: 1팀 로스터\n2: 2팀 로스터', '1');
             if (teamChoice !== '1' && teamChoice !== '2') return;
 
-            seasons.push({
+            const baseSeason = seasons.length > 0 ? seasons[0] : null;
+
+            seasons.unshift({
                 id: `season_${Date.now()}`,
                 name: name.trim(), targetTeam: teamChoice === '1' ? 'team1' : 'team2',
                 draftState: { starter: false, relief: false, bullpen: false },
@@ -1069,7 +1071,7 @@
             });
             normalizeSeasonsData();
             saveStateToStorage(); 
-            switchMainView(`season_${seasons.length - 1}_reg`);
+            switchMainView(`season_0_reg`);
         }
 
         function deleteSeason(idx) {
