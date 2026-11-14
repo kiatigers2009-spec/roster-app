@@ -1671,6 +1671,7 @@
 
             players.forEach(p => {
                 const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name);
+                let minorCount = getPlayerMinorRegistrationCount(season, p.name); // [추가] 마이너 전환 횟수 계산
                 let lastIdx = timeline.findIndex(t => t.type === 'game' && t.gNum === lastG);
                 let nextIdx = timeline.findIndex(t => t.type === 'game' && t.gNum === nextG);
 
@@ -1685,6 +1686,9 @@
                                 <input type="radio" name="demotePlayer" value="${p.name}" class="text-brand-600">
                                 <span class="font-bold">${p.name}</span>
                                 <span class="text-slate-400">(${p.position}, ${p.hand})</span>
+                                </div>
+                                <!-- [추가] 마이너 전환 횟수 배지 -->
+                                <span class="text-[10px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950 px-1.5 py-0.5 rounded">[${minorCount}/5]</span>
                             </label>
                         `;
                     }
@@ -1696,6 +1700,9 @@
                                 <input type="radio" name="callupPlayer" value="${p.name}" class="text-brand-600">
                                 <span class="font-bold">${p.name}</span>
                                 <span class="text-slate-400">(${p.position}, ${p.hand})</span>
+                                </div>
+                                <!-- [추가] 마이너 전환 횟수 배지 -->
+                                <span class="text-[10px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950 px-1.5 py-0.5 rounded">[${minorCount}/5]</span>
                             </label>
                         `;
                     }
@@ -1772,6 +1779,7 @@
             players.forEach(p => {
                 if (p.name === returningPlayerName) return;
                 const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name);
+                let minorCount = getPlayerMinorRegistrationCount(season, p.name); // [추가] 마이너 전환 횟수 계산
                 let prevIdx = timeline.findIndex(t => t.type === 'game' && t.gNum === prevG);
                 let curIdx = timeline.findIndex(t => t.type === 'game' && t.gNum === targetGameNum);
                 
@@ -1785,6 +1793,9 @@
                             <input type="radio" name="injuryDemotePlayer" value="${p.name}" class="text-brand-600">
                             <span class="font-bold">${p.name}</span>
                             <span class="text-slate-400">(${p.position}, ${p.hand})</span>
+                            </div>
+                            <!-- [추가] 마이너 전환 횟수 배지 -->
+                            <span class="text-[10px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950 px-1.5 py-0.5 rounded">[${minorCount}/5]</span>
                         </label>
                     `;
                 }
@@ -1866,6 +1877,7 @@
             players.forEach(p => {
                 if (p.name === injuredPlayerName) return;
                 const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name);
+                let minorCount = getPlayerMinorRegistrationCount(season, p.name); // [추가] 마이너 전환 횟수 계산
                 let prevIdx = timeline.findIndex(t => t.type === 'game' && t.gNum === prevG);
                 let curIdx = timeline.findIndex(t => t.type === 'game' && t.gNum === targetGameNum);
 
@@ -1879,6 +1891,9 @@
                             <input type="radio" name="injuryCallupPlayer" value="${p.name}" class="text-brand-600">
                             <span class="font-bold">${p.name}</span>
                             <span class="text-slate-400">(${p.position}, ${p.hand})</span>
+                            </div>
+                            <!-- [추가] 마이너 전환 횟수 배지 -->
+                            <span class="text-[10px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950 px-1.5 py-0.5 rounded">[${minorCount}/5]</span>
                         </label>
                     `;
                 }
