@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> 로스터 관리 & 시즌 현황판 </title>
+    <title> 로스터 관리 & 시즌 현황판 </title> 
     <link rel="manifest" href="manifest.json">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -26,6 +26,7 @@
                 }
             }
         }
+
     </script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -862,6 +863,19 @@
                 if (!s.seasonEval.playerData) s.seasonEval.playerData = {};
                 if (!s.seasonEval.firstHalfComments) s.seasonEval.firstHalfComments = {};
                 if (!s.seasonEval.fullSeasonComments) s.seasonEval.fullSeasonComments = {};
+                // normalizeSeasonsData 함수 내 seasonEval 초기화 부분에 추가
+                if (!s.seasonEval.secondHalfTeamEval) {
+                    s.seasonEval.secondHalfTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
+                }
+                if (!s.seasonEval.secondHalfComments) {
+                    s.seasonEval.secondHalfComments = {};
+                }
+                if (!s.seasonEval.sortState.secondHalf) {
+                    s.seasonEval.sortState.secondHalf = { field: null, asc: false };
+                }
+                if (s.seasonEval.secondHalfCollapsed === undefined) {
+                    s.seasonEval.secondHalfCollapsed = false;
+                }
                 
                 if (!s.psEval) s.psEval = { dsStatus: '진출', csStatus: '진출', wsStatus: '우승', dsTeamEval: { title: '', body: '', win: '', mvp: '' }, csTeamEval: { title: '', body: '', win: '', mvp: '' }, wsTeamEval: { title: '', body: '', win: '', mvp: '' }, playerData: {}, dsComments: {}, csComments: {}, wsComments: {} };
                 // 기존 선택지 마이그레이션 보정
@@ -1499,6 +1513,7 @@
             timeline.forEach((t, idx) => {
                 if (t.type === 'game') {
                     if (rangeType === 'firstHalf' && t.gNum > 84) return;
+                    if (rangeType === 'secondHalf' && t.gNum < 85) return; // 👈 후반기 기준(85G~160G) 적용
                     let stInfo = statusMap[idx];
                     if (stInfo && stInfo.status) {
                         let st = stInfo.status;
@@ -1552,6 +1567,8 @@
                 psevalDiv.className = `space-y-6 max-w-7xl mx-auto ${currentActiveView === `season_${sIdx}_pseval` ? '' : 'hidden'}`;
                 psevalDiv.innerHTML = renderPsEvalHtml(s, sIdx, matrixPlayers);
                 container.appendChild(psevalDiv);
+
+                computeAndRenderSecondHalfTeamStats(s, sIdx);
             });
         }
 
@@ -2212,6 +2229,34 @@
                         </div>
                     </div>
                     
+                    <!-- 후반기 팀 및 선수별 평가 영역 -->
+                    <!-- 기존 후반기 팀 종합 평가 UI 부분을 아래 코드로 교체해주세요 -->
+                    <div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border space-y-4">
+                        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                            <div class="flex items-center space-x-2 flex-1 w-full">
+                                <h3 class="font-bold text-sm text-emerald-600 shrink-0">📌 후반기 팀 종합 평가</h3>
+                                <input type="text" value="${s.seasonEval.secondHalfTeamEval?.title || ''}" onchange="updateTeamEvalCustom(${sIdx}, 'secondHalfTeamEval', 'title', this.value)" placeholder="평가 제목 입력" class="w-full sm:w-72 border rounded-xl px-3 py-2 text-xs font-bold bg-white dark:bg-slate-800">
+                                <button onclick="openMemoModal(${sIdx}, 'seasonEval', 'secondHalfTeam', 'team')" class="px-3 py-2 text-xs bg-emerald-600 text-white rounded-xl font-semibold shrink-0 shadow-sm">전체 평가</button>
+                            </div>
+                            <div class="grid grid-cols-4 gap-2 w-full lg:w-auto shrink-0">
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">승패</label><span id="sh-win-${sIdx}" class="font-bold text-xs text-emerald-600">-</span></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">승률</label><span id="sh-winrate-${sIdx}" class="font-bold text-xs text-emerald-600">-</span></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">ERA</label><span id="sh-era-${sIdx}" class="font-bold text-xs text-emerald-600">-</span></div>
+                                <div class="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border text-center"><label class="text-[9px] text-slate-500 block">OPS</label><span id="sh-ops-${sIdx}" class="font-bold text-xs text-emerald-600">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center cursor-pointer select-none py-1" onclick="toggleEvalCollapse(${sIdx}, 'secondHalf')">
+                            <h3 class="font-bold text-sm text-emerald-600">👤 후반기 선수별 평가 (자동 계산 시스템)</h3>
+                            <span class="text-xs text-emerald-600 font-semibold px-2 py-1 bg-emerald-50 dark:bg-emerald-950 rounded-lg">${s.seasonEval.secondHalfCollapsed ? '펼치기 ▼' : '접기 ▲'}</span>
+                        </div>
+                        <div class="overflow-x-auto border rounded-2xl ${s.seasonEval.secondHalfCollapsed ? 'hidden' : ''}">
+                            <table class="w-full text-xs text-left">${renderPlayerEvalTableContent(s, sIdx, 'secondHalf')}</table>
+                        </div>
+                    </div>
+
                     <!-- 전체 시즌 팀 종합 평가 영역 + 기록실 반영 버튼 -->
                     <div class="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border space-y-4 pt-4">
                         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -2293,9 +2338,16 @@
             
             players.forEach(p => {
                 const stats = computePlayerStatsSummary(s, p.name, rangeType);
-                const commentData = s.seasonEval[rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments']?.[p.name] || { title: '', body: '' };
+
+                const commentKey = rangeType === 'firstHalf' ? 'firstHalfComments' : (rangeType === 'secondHalf' ? 'secondHalfComments' : 'fullSeasonComments');
+                const commentData = s.seasonEval[commentKey]?.[p.name] || { title: '', body: '' };
+
                 const statKey = `${rangeType}_${p.name}`;
-                const userStats = s.seasonEval.playerData?.[statKey] || {};
+                let userStats = s.seasonEval.playerData?.[statKey] || {};
+
+                if (rangeType === 'secondHalf' && Object.keys(userStats).length === 0) {
+                        userStats = calculateSecondHalfStats(s, p.name);
+                    }
 
                 html += `
                     <tr>
@@ -3558,7 +3610,11 @@
 
         function toggleEvalCollapse(sIdx, rangeType) {
             const season = seasons[sIdx];
-            const key = rangeType === 'firstHalf' ? 'firstHalfCollapsed' : 'fullSeasonCollapsed';
+
+            let key = 'fullSeasonCollapsed';
+            if (rangeType === 'firstHalf') key = 'firstHalfCollapsed';
+            else if (rangeType === 'secondHalf') key = 'secondHalfCollapsed';
+
             season.seasonEval[key] = !season.seasonEval[key];
             saveStateToStorage();
             refreshAppUI();
@@ -3744,13 +3800,159 @@ function resetRecordSort(tabKey) {
     renderRecordsViews();
 }
 
-function updateTeamRecordName(recId, newName) {
-    if (recordsArchive.teamRecords[recId]) {
-        recordsArchive.teamRecords[recId].seasonName = newName.trim();
-        saveStateToStorage();
+// [신설] 전체 시즌 성적 - 전반기 성적 -> 후반기 성적 자동 계산 함수
+function calculateSecondHalfStats(season, playerName) {
+    const fullStat = season.seasonEval.playerData?.[`fullSeason_${playerName}`] || {};
+    const firstStat = season.seasonEval.playerData?.[`firstHalf_${playerName}`] || {};
+
+    // 이닝 계산 (아웃카운트 기준)
+    const fullOuts = ipToOuts(fullStat.ip);
+    const firstOuts = ipToOuts(firstStat.ip);
+    const secondOuts = Math.max(0, fullOuts - firstOuts);
+    const secondRealIp = secondOuts / 3;
+
+    // 누적 카운트 차감 (승, 패, 홀드, 세이브, 탈삼진, QS, K 등)
+    const diffInt = (f) => {
+        const fVal = parseInt(fullStat[f], 10) || 0;
+        const iVal = parseInt(firstStat[f], 10) || 0;
+        const diff = fVal - iVal;
+        return diff > 0 ? diff : '';
+    };
+
+    const win = diffInt('win');
+    const loss = diffInt('loss');
+    const hold = diffInt('hold');
+    const save = diffInt('save');
+    const k = diffInt('k');
+    const qs = diffInt('qs');
+    let war = '';
+    if (fullStat.war !== undefined && fullStat.war !== null && String(fullStat.war).trim() !== '') {
+        const fullWarNum = parseFloat(fullStat.war) || 0;
+        const firstWarNum = parseFloat(firstStat.war) || 0;
+        war = (fullWarNum - firstWarNum).toFixed(2);
     }
+
+    // ERA 및 WHIP 역산 계산
+    let eraStr = '';
+    let whipStr = '';
+    let k9Str = '';
+
+    if (secondOuts > 0) {
+        // 자책점 역산: (전체 ERA * 전체 이닝) - (전반기 ERA * 전반기 이닝)
+        if (fullStat.era && firstStat.era) {
+            const fullEr = (parseFloat(fullStat.era) * (fullOuts / 3)) / 9;
+            const firstEr = (parseFloat(firstStat.era) * (firstOuts / 3)) / 9;
+            const secondEr = Math.max(0, fullEr - firstEr);
+            eraStr = ((secondEr * 9) / secondRealIp).toFixed(2);
+        }
+        // WHIP 역산: (전체 WHIP * 전체 이닝) - (전반기 WHIP * 전반기 이닝)
+        if (fullStat.whip && firstStat.whip) {
+            const fullHb = parseFloat(fullStat.whip) * (fullOuts / 3);
+            const firstHb = parseFloat(firstStat.whip) * (firstOuts / 3);
+            const secondHb = Math.max(0, fullHb - firstHb);
+            whipStr = (secondHb / secondRealIp).toFixed(2);
+        }
+        if (k !== '') {
+            k9Str = ((k * 9) / secondRealIp).toFixed(2);
+        }
+    }
+
+    return {
+        era: eraStr,
+        ip: secondOuts > 0 ? outsToIpStr(secondOuts) : '',
+        k: k !== '' ? k : '',
+        win: win !== '' ? win : '',
+        loss: loss !== '' ? loss : '',
+        hold: hold !== '' ? hold : '',
+        save: save !== '' ? save : '',
+        whip: whipStr,
+        k9: k9Str,
+        qs: qs !== '' ? qs : '',
+        war: war !== '0.0' ? war : ''
+    };
 }
 
+// 승패 문자열("승-패")을 파싱하여 [승, 패] 배열로 반환
+function parseWinLoss(wlStr) {
+    if (!wlStr || typeof wlStr !== 'string') return [0, 0];
+    const parts = wlStr.split('-');
+    const w = parseInt(parts[0], 10) || 0;
+    const l = parseInt(parts[1], 10) || 0;
+    return [w, l];
+}
+
+// 후반기 팀 기록 자동 계산 및 렌더링 반영 로직
+function computeAndRenderSecondHalfTeamStats(s, sIdx) {
+    const topWin = s.seasonEval.win || ''; // 전체 시즌 승패
+    const fhWin = s.seasonEval.firstHalfTeamEval?.win || ''; // 전반기 승패
+
+    let shWinStr = '-';
+    let shWinRateStr = '-';
+
+    if (topWin && fhWin) {
+        const [tW, tL] = parseWinLoss(topWin);
+        const [fW, fL] = parseWinLoss(fhWin);
+        const sW = tW - fW;
+        const sL = tL - fL;
+        shWinStr = `${sW}-${sL}`;
+        const totalGames = sW + sL;
+        shWinRateStr = totalGames > 0 ? (sW / totalGames).toFixed(3).replace(/^0/, '') : '.000';
+    }
+
+    // ERA 역산 계산 (선수별 IP 및 ERA 기반)
+    let totalFirstIpOuts = 0, totalFirstEr = 0;
+    let totalFullIpOuts = 0, totalFullEr = 0;
+
+    const players = getSeasonEffectiveRoster(s);
+    players.forEach(p => {
+        const fhStat = s.seasonEval.playerData?.[`firstHalf_${p.name}`] || {};
+        const fsStat = s.seasonEval.playerData?.[`fullSeason_${p.name}`] || {};
+
+        const fIpOuts = ipToOuts(fhStat.ip);
+        const fEra = parseFloat(fhStat.era);
+        if (fIpOuts > 0 && !isNaN(fEra)) {
+            totalFirstIpOuts += fIpOuts;
+            totalFirstEr += (fEra * (fIpOuts / 3)) / 9;
+        }
+
+        const fullIpOuts = ipToOuts(fsStat.ip);
+        const fullEra = parseFloat(fsStat.era);
+        if (fullIpOuts > 0 && !isNaN(fullEra)) {
+            totalFullIpOuts += fullIpOuts;
+            totalFullEr += (fullEra * (fullIpOuts / 3)) / 9;
+        }
+    });
+
+    let shEraStr = '-';
+    const shIpOuts = totalFullIpOuts - totalFirstIpOuts;
+    const shEr = totalFullEr - totalFirstEr;
+    if (shIpOuts > 0 && shEr >= 0) {
+        const shIpReal = shIpOuts / 3;
+        shEraStr = ((shEr * 9) / shIpReal).toFixed(2);
+    }
+
+    // OPS 단순 평균 역산 반영 (후반기 OPS = 시즌 OPS * 2 - 전반기 OPS)
+    let shOpsStr = '-';
+    const topOps = parseFloat(s.seasonEval.teamOps);
+    const fhOps = parseFloat(s.seasonEval.firstHalfTeamEval?.ops);
+    if (!isNaN(topOps) && !isNaN(fhOps)) {
+        const shOps = (topOps * 2) - fhOps;
+        shOpsStr = shOps.toFixed(3).replace(/^0/, '');
+    }
+
+    // DOM에 반영
+    setTimeout(() => {
+        const wEl = document.getElementById(`sh-win-${sIdx}`);
+        const wrEl = document.getElementById(`sh-winrate-${sIdx}`);
+        const eEl = document.getElementById(`sh-era-${sIdx}`);
+        const oEl = document.getElementById(`sh-ops-${sIdx}`);
+
+        if (wEl) wEl.textContent = shWinStr;
+        if (wrEl) wrEl.textContent = shWinRateStr;
+        if (eEl) eEl.textContent = shEraStr;
+        if (oEl) oEl.textContent = shOpsStr;
+    }, 50);
+}
     </script>
 </body>
 </html>
