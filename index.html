@@ -3542,6 +3542,8 @@
 
             let majorCandidates = [];
             for (const p of players) {
+                if (p.type === '공통 선수') continue;
+                
                 const { timeline, statusMap } = computePlayerTimelineStatus(season, p.name);
                 let prevIdx = timeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum - 1);
                 let curIdx = timeline.findIndex(t => t.category === 'reg' && t.type === 'game' && t.gNum === targetGameNum);
