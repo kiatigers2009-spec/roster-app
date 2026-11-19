@@ -862,6 +862,7 @@
                 if (!s.seasonEval.fullSeasonTeamEval) s.seasonEval.fullSeasonTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
                 if (!s.seasonEval.playerData) s.seasonEval.playerData = {};
                 if (!s.seasonEval.firstHalfComments) s.seasonEval.firstHalfComments = {};
+                if (!s.seasonEval.secondHalfComments) s.seasonEval.secondHalfComments = {};
                 if (!s.seasonEval.fullSeasonComments) s.seasonEval.fullSeasonComments = {};
                 // normalizeSeasonsData 함수 내 seasonEval 초기화 부분에 추가
                 if (!s.seasonEval.secondHalfTeamEval) {
@@ -2345,9 +2346,20 @@
                 const statKey = `${rangeType}_${p.name}`;
                 let userStats = s.seasonEval.playerData?.[statKey] || {};
 
-                if (rangeType === 'secondHalf' && Object.keys(userStats).length === 0) {
-                        userStats = calculateSecondHalfStats(s, p.name);
-                    }
+                if (rangeType === 'secondHalf') {
+                    const autoStats = calculateSecondHalfStats(s, p.name);
+                    const overrides = (userStats && userStats.manualOverrides) || {};
+                    const merged = { ...autoStats };
+
+                    Object.keys(overrides).forEach((field) => {
+                        if (overrides[field] && userStats[field] !== undefined) {
+                            merged[field] = userStats[field];
+                        }
+                    });
+
+                    merged.manualOverrides = overrides;
+                    userStats = merged;
+                }
 
                 html += `
                     <tr>
@@ -3628,32 +3640,87 @@
             seasons[sIdx].seasonEval[evalGroupKey][field] = val;
             saveStateToStorage();
         }
+
         function updatePsTeamEval(sIdx, teamEvalKey, field, val) {
             if (!seasons[sIdx].psEval[teamEvalKey]) seasons[sIdx].psEval[teamEvalKey] = { title: '', body: '', win: '', mvp: '' };
             seasons[sIdx].psEval[teamEvalKey][field] = val;
             saveStateToStorage();
         }
 
-        function updatePlayerStat(sIdx, key, field, val) { if (!seasons[sIdx].seasonEval.playerData[key]) seasons[sIdx].seasonEval.playerData[key] = {}; seasons[sIdx].seasonEval.playerData[key][field] = val; saveStateToStorage(); }
-        function updateCommentTitle(sIdx, rangeType, playerName, val) { const k = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments'; if (!seasons[sIdx].seasonEval[k][playerName]) seasons[sIdx].seasonEval[k][playerName] = { title: '', body: '' }; seasons[sIdx].seasonEval[k][playerName].title = val; saveStateToStorage(); }
+       function updatePlayerStat(sIdx, key, field, val) {
+           if (!seasons[sIdx].seasonEval.playerData[key]) {
+               seasons[sIdx].seasonEval.playerData[key] = {};
+           }
+
+           const target = seasons[sIdx].seasonEval.playerData[key];
+
+           // 후반기 선수 성적(secondHalf_선수명)을 직접 입력할 때 수동 덮어쓰기 기록
+           if (key.startsWith('secondHalf_')) {
+               if (!target.manualOverrides) {
+                   target.manualOverrides = {};
+               }
+        const trimmed = String(val).trim();
+                      if (trimmed === '') {
+            // 입력값을 지우면 수동 덮어쓰기 해제 -> 다시 자동 계산값 표시
+                   delete target[field];
+                   delete target.manualOverrides[field];
+               } else {
+            // 숫자를 입력하면 해당 칸만 수동 값으로 고정
+                   target[field] = val;
+                   target.manualOverrides[field] = true;
+               }
+               saveStateToStorage();
+               refreshAppUI();
+               return;
+           }
+
+           // 전반기(firstHalf_)나 전체 시즌(fullSeason_) 성적이 바뀌면 후반기 자동 계산이 즉시 반영되도록 화면 갱신
+           target[field] = val;
+           saveStateToStorage();
+           if (key.startsWith('firstHalf_') || key.startsWith('fullSeason_')) {
+               refreshAppUI();
+           }
+       }
+        
+       function getSeasonCommentKey(rangeType) {
+    if (rangeType === 'firstHalf') return 'firstHalfComments';
+    if (rangeType === 'secondHalf') return 'secondHalfComments';
+    return 'fullSeasonComments';
+}
+
+function updateCommentTitle(sIdx, rangeType, playerName, val) {
+    const k = getSeasonCommentKey(rangeType);
+    if (!seasons[sIdx].seasonEval[k]) seasons[sIdx].seasonEval[k] = {};
+    if (!seasons[sIdx].seasonEval[k][playerName]) {
+        seasons[sIdx].seasonEval[k][playerName] = { title: '', body: '' };
+    }
+    seasons[sIdx].seasonEval[k][playerName].title = val;
+    saveStateToStorage();
+}
+
         function updatePsEvalStatus(sIdx, field, val) { seasons[sIdx].psEval[field] = val; saveStateToStorage(); }
         function updatePsStat(sIdx, key, field, val) { if (!seasons[sIdx].psEval.playerData[key]) seasons[sIdx].psEval.playerData[key] = {}; seasons[sIdx].psEval.playerData[key][field] = val; saveStateToStorage(); }
         function updatePsCommentTitle(sIdx, key, playerName, val) { if (!seasons[sIdx].psEval[key][playerName]) seasons[sIdx].psEval[key][playerName] = { title: '', body: '' }; seasons[sIdx].psEval[key][playerName].title = val; saveStateToStorage(); }
 
         function openMemoModal(sIdx, evalType, rangeType, playerName) {
             memoCtx = { sIdx, evalType, rangeType, playerName }; const season = seasons[sIdx]; let currentBody = ''; let titleTxt = '';
-            if (evalType === 'seasonEval') {
-                if (rangeType === 'firstHalfTeam') {
-                    currentBody = season.seasonEval.firstHalfTeamEval?.body || '';
-                    titleTxt = '전반기 팀 종합 평가 전체 메모';
-                } else if (rangeType === 'fullSeasonTeam') {
-                    currentBody = season.seasonEval.fullSeasonTeamEval?.body || '';
-                    titleTxt = '전체 시즌 팀 종합 평가 전체 메모';
-                } else {
-                    const k = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments'; 
-                    currentBody = season.seasonEval[k]?.[playerName]?.body || ''; 
-                    titleTxt = `[${playerName}] 전체 평가 메모장`;
-                }
+           if (evalType === 'seasonEval') {
+    if (rangeType === 'firstHalfTeam') {
+        currentBody = season.seasonEval.firstHalfTeamEval?.body || '';
+        titleTxt = '전반기 팀 종합 평가 전체 메모';
+    } else if (rangeType === 'secondHalfTeam') {
+        currentBody = season.seasonEval.secondHalfTeamEval?.body || '';
+        titleTxt = '후반기 팀 종합 평가 전체 메모';
+    } else if (rangeType === 'fullSeasonTeam') {
+        currentBody = season.seasonEval.fullSeasonTeamEval?.body || '';
+        titleTxt = '전체 시즌 팀 종합 평가 전체 메모';
+    } else {
+        const k = getSeasonCommentKey(rangeType);
+        const rangeLabel = rangeType === 'firstHalf' ? '전반기' : (rangeType === 'secondHalf' ? '후반기' : '전체 시즌');
+        currentBody = season.seasonEval[k]?.[playerName]?.body || '';
+        titleTxt = `[${playerName}] ${rangeLabel} 전체 평가 메모장`;
+    }
+
             } else if (evalType === 'psEvalTeam') {
                 currentBody = season.psEval[rangeType]?.body || '';
                 titleTxt = `포스트시즌 시리즈 팀 종합 평가 전체 메모`;
@@ -3668,18 +3735,23 @@
         function closeMemoModal() { document.getElementById('memoModal').classList.add('hidden'); }
         function saveMemoModal() {
             const { sIdx, evalType, rangeType, playerName } = memoCtx; const bodyVal = document.getElementById('memoModalTextarea').value; const season = seasons[sIdx];
-            if (evalType === 'seasonEval') {
-                if (rangeType === 'firstHalfTeam') {
-                    if (!season.seasonEval.firstHalfTeamEval) season.seasonEval.firstHalfTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
-                    season.seasonEval.firstHalfTeamEval.body = bodyVal;
-                } else if (rangeType === 'fullSeasonTeam') {
-                    if (!season.seasonEval.fullSeasonTeamEval) season.seasonEval.fullSeasonTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
-                    season.seasonEval.fullSeasonTeamEval.body = bodyVal;
-                } else {
-                    const k = rangeType === 'firstHalf' ? 'firstHalfComments' : 'fullSeasonComments'; 
-                    if (!season.seasonEval[k][playerName]) season.seasonEval[k][playerName] = { title: '', body: '' }; 
-                    season.seasonEval[k][playerName].body = bodyVal;
-                }
+           if (evalType === 'seasonEval') {
+    if (rangeType === 'firstHalfTeam') {
+        if (!season.seasonEval.firstHalfTeamEval) season.seasonEval.firstHalfTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
+        season.seasonEval.firstHalfTeamEval.body = bodyVal;
+    } else if (rangeType === 'secondHalfTeam') {
+        if (!season.seasonEval.secondHalfTeamEval) season.seasonEval.secondHalfTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
+        season.seasonEval.secondHalfTeamEval.body = bodyVal;
+    } else if (rangeType === 'fullSeasonTeam') {
+        if (!season.seasonEval.fullSeasonTeamEval) season.seasonEval.fullSeasonTeamEval = { rank: '', win: '', winRate: '', era: '', ops: '', title: '', body: '' };
+        season.seasonEval.fullSeasonTeamEval.body = bodyVal;
+    } else {
+        const k = getSeasonCommentKey(rangeType);
+        if (!season.seasonEval[k]) season.seasonEval[k] = {};
+        if (!season.seasonEval[k][playerName]) season.seasonEval[k][playerName] = { title: '', body: '' };
+        season.seasonEval[k][playerName].body = bodyVal;
+    }
+
             } else if (evalType === 'psEvalTeam') {
                 if (!season.psEval[rangeType]) season.psEval[rangeType] = { title: '', body: '', win: '', mvp: '' };
                 season.psEval[rangeType].body = bodyVal;
@@ -3818,7 +3890,7 @@ function calculateSecondHalfStats(season, playerName) {
         const fVal = parseInt(fullStat[f], 10) || 0;
         const iVal = parseInt(firstStat[f], 10) || 0;
         const diff = fVal - iVal;
-        return diff > 0 ? diff : '';
+        return diff >= 0 ? diff : '';
     };
 
     const win = diffInt('win');
@@ -3827,6 +3899,7 @@ function calculateSecondHalfStats(season, playerName) {
     const save = diffInt('save');
     const k = diffInt('k');
     const qs = diffInt('qs');
+
     let war = '';
     if (fullStat.war !== undefined && fullStat.war !== null && String(fullStat.war).trim() !== '') {
         const fullWarNum = parseFloat(fullStat.war) || 0;
