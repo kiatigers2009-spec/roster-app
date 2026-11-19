@@ -4045,30 +4045,43 @@ function parseWinLoss(wlStr) {
 
 // 후반기 팀 기록 자동 계산 및 렌더링 반영 로직
 function computeAndRenderSecondHalfTeamStats(s, sIdx) {
-    const topWin = s.seasonEval.win || ''; // 전체 시즌 승패
-    const fhWin = s.seasonEval.firstHalfTeamEval?.win || ''; // 전반기 승패
+    const ev = s.seasonEval || {};
+    const fsEval = ev.fullSeasonTeamEval || {};
+    const fhEval = ev.firstHalfTeamEval || {};
+
+    // 1. 승패 및 승률: 전체 시즌(fullSeasonTeamEval) 우선, 없으면 상단(ev.win) 사용
+    const fullWin = fsEval.win || ev.win || '';
+    const fhWin = fhEval.win || '';
 
     let shWinStr = '-';
     let shWinRateStr = '-';
 
-    if (topWin && fhWin) {
-        const [tW, tL] = parseWinLoss(topWin);
-        const [fW, fL] = parseWinLoss(fhWin);
-        const sW = tW - fW;
-        const sL = tL - fL;
-        shWinStr = `${sW}-${sL}`;
-        const totalGames = sW + sL;
-        shWinRateStr = totalGames > 0 ? (sW / totalGames).toFixed(3).replace(/^0/, '') : '.000';
+    if (fullWin && fhWin) {
+        const [fullW, fullL, fullD] = parseWinLoss(fullWin);
+        const [fhW, fhL, fhD] = parseWinLoss(fhWin);
+
+        const sW = fullW - fhW;
+        const sL = fullL - fhL;
+        const sD = Math.max(0, fullD - fhD);
+
+        shWinStr = sD > 0 ? `${sW}-${sL}-${sD}` : `${sW}-${sL}`;
+        const decisionGames = sW + sL;
+        if (decisionGames > 0) {
+            const rate = sW / decisionGames;
+            shWinRateStr = rate >= 1 ? '1.000' : rate.toFixed(3).replace(/^0/, '');
+        } else if (sD > 0) {
+            shWinRateStr = '.000';
+        }
     }
 
-    // ERA 역산 계산 (선수별 IP 및 ERA 기반)
+    // 2. ERA 역산 계산 (기존 로직 유지)
     let totalFirstIpOuts = 0, totalFirstEr = 0;
     let totalFullIpOuts = 0, totalFullEr = 0;
 
     const players = getSeasonEffectiveRoster(s);
     players.forEach(p => {
-        const fhStat = s.seasonEval.playerData?.[`firstHalf_${p.name}`] || {};
-        const fsStat = s.seasonEval.playerData?.[`fullSeason_${p.name}`] || {};
+        const fhStat = ev.playerData?.[`firstHalf_${p.name}`] || {};
+        const fsStat = ev.playerData?.[`fullSeason_${p.name}`] || {};
 
         const fIpOuts = ipToOuts(fhStat.ip);
         const fEra = parseFloat(fhStat.era);
@@ -4093,17 +4106,18 @@ function computeAndRenderSecondHalfTeamStats(s, sIdx) {
         shEraStr = ((shEr * 9) / shIpReal).toFixed(2);
     }
 
-    // OPS 단순 평균 역산 반영 (후반기 OPS = 시즌 OPS * 2 - 전반기 OPS)
+    // 3. OPS 역산: 전체 시즌(fullSeasonTeamEval.ops) 우선, 없으면 상단(ev.teamOps) 사용
     let shOpsStr = '-';
-    const topOps = parseFloat(s.seasonEval.teamOps);
-    const fhOps = parseFloat(s.seasonEval.firstHalfTeamEval?.ops);
-    if (!isNaN(topOps) && !isNaN(fhOps)) {
-        const shOps = (topOps * 2) - fhOps;
-        shOpsStr = shOps.toFixed(3).replace(/^0/, '');
+    const fullOps = parseFloat(fsEval.ops !== undefined && fsEval.ops !== '' ? fsEval.ops : ev.teamOps);
+    const fhOps = parseFloat(fhEval.ops);
+    if (!isNaN(fullOps) && !isNaN(fhOps)) {
+        // 전체 OPS와 전반기 OPS가 동일 비율/가중치로 되어 있는 경우: (전체 * 2) - 전반기
+        // 만약 경기수 가중 역산이 필요하면 아래 주석 참고
+        const shOps = (fullOps * 2) - fhOps;
+        shOpsStr = shOps >= 1 ? shOps.toFixed(3) : shOps.toFixed(3).replace(/^0/, '');
     }
 
-    // DOM에 반영
-    setTimeout(() => {
+    const applyDom = () => {
         const wEl = document.getElementById(`sh-win-${sIdx}`);
         const wrEl = document.getElementById(`sh-winrate-${sIdx}`);
         const eEl = document.getElementById(`sh-era-${sIdx}`);
@@ -4113,7 +4127,10 @@ function computeAndRenderSecondHalfTeamStats(s, sIdx) {
         if (wrEl) wrEl.textContent = shWinRateStr;
         if (eEl) eEl.textContent = shEraStr;
         if (oEl) oEl.textContent = shOpsStr;
-    }, 50);
+    };
+
+    applyDom();
+    setTimeout(applyDom, 50);
 }
 
 window.handleStatTabKey = handleStatTabKey;
