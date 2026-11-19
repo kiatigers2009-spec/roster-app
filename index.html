@@ -2294,6 +2294,32 @@
             `;
         }
 
+function getEvalStatValueForSort(season, rangeType, playerName, field) {
+    const statKey = `${rangeType}_${playerName}`;
+    const stored = season.seasonEval.playerData?.[statKey] || {};
+
+    let rawVal;
+    if (rangeType === 'secondHalf') {
+        const autoStats = calculateSecondHalfStats(season, playerName);
+        const overrides = stored.manualOverrides || {};
+        rawVal = overrides[field] && stored[field] !== undefined ? stored[field] : autoStats[field];
+    } else {
+        rawVal = stored[field];
+    }
+
+    if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') {
+        return null;
+    }
+
+    if (field === 'ip') {
+        return ipToOuts(rawVal);
+    }
+
+    const num = parseFloat(rawVal);
+    return isNaN(num) ? null : num;
+}
+
+
         function renderPlayerEvalTableContent(s, sIdx, rangeType) {
             const sortSt = s.seasonEval.sortState?.[rangeType] || { field: null, asc: false };
             const getIndicator = (f) => {
@@ -2304,17 +2330,22 @@
             let players = sortMatrixPlayers(getSeasonEffectiveRoster(s).filter(p => p.type !== '방출'));
             
             if (sortSt.field) {
-                let field = sortSt.field;
-                let asc = sortSt.asc;
-                players.sort((a, b) => {
-                    const statKeyA = `${rangeType}_${a.name}`;
-                    const statKeyB = `${rangeType}_${b.name}`;
-                    const valA = parseFloat(s.seasonEval.playerData?.[statKeyA]?.[field]) || 0;
-                    const valB = parseFloat(s.seasonEval.playerData?.[statKeyB]?.[field]) || 0;
-                    if (valA === valB) return 0;
-                    return asc ? (valA - valB) : (valB - valA);
-                });
-            }
+    const field = sortSt.field;
+    const asc = sortSt.asc;
+
+    players.sort((a, b) => {
+        const valA = getEvalStatValueForSort(s, rangeType, a.name, field);
+        const valB = getEvalStatValueForSort(s, rangeType, b.name, field);
+
+        if (valA === null && valB === null) return 0;
+        if (valA === null) return 1;
+        if (valB === null) return -1;
+
+        if (valA === valB) return 0;
+
+        return asc ? (valA - valB) : (valB - valA);
+    });
+}
 
             let html = `
                 <thead class="bg-slate-50 dark:bg-slate-900 text-slate-500 border-b">
@@ -3615,21 +3646,34 @@
             alert('최신화가 완료되었습니다.');
         }
 
-        function sortPlayerEval(sIdx, rangeType, field) {
-            const season = seasons[sIdx];
-            if (!season.seasonEval.sortState) season.seasonEval.sortState = { firstHalf: { field: null, asc: false }, fullSeason: { field: null, asc: false } };
-            const cur = season.seasonEval.sortState[rangeType];
-            if (field === 'name') {
-                season.seasonEval.sortState[rangeType] = { field: null, asc: false };
-            } else if (cur.field === field) {
-                cur.asc = !cur.asc;
-            } else {
-                cur.field = field;
-                cur.asc = false;
-            }
-            saveStateToStorage();
-            refreshAppUI();
-        }
+      function sortPlayerEval(sIdx, rangeType, field) {
+    const season = seasons[sIdx];
+    if (!season.seasonEval.sortState) {
+        season.seasonEval.sortState = {
+            firstHalf: { field: null, asc: false },
+            secondHalf: { field: null, asc: false },
+            fullSeason: { field: null, asc: false }
+        };
+    }
+    if (!season.seasonEval.sortState[rangeType]) {
+        season.seasonEval.sortState[rangeType] = { field: null, asc: false };
+    }
+
+    const cur = season.seasonEval.sortState[rangeType];
+    const lowerIsBetter = ['era', 'whip'].includes(field);
+
+    if (field === 'name') {
+        season.seasonEval.sortState[rangeType] = { field: null, asc: false };
+    } else if (cur.field === field) {
+        cur.asc = !cur.asc;
+    } else {
+        cur.field = field;
+        cur.asc = lowerIsBetter;
+    }
+
+    saveStateToStorage();
+    refreshAppUI();
+}
 
         function toggleEvalCollapse(sIdx, rangeType) {
             const season = seasons[sIdx];
@@ -3662,12 +3706,12 @@ function updatePlayerStat(sIdx, key, field, val) {
     }
 
     const target = seasons[sIdx].seasonEval.playerData[key];
+    const trimmed = String(val).trim();
 
     if (key.startsWith('secondHalf_')) {
         if (!target.manualOverrides) {
             target.manualOverrides = {};
         }
-        const trimmed = String(val).trim();
         if (trimmed === '') {
             delete target[field];
             delete target.manualOverrides[field];
@@ -3676,19 +3720,17 @@ function updatePlayerStat(sIdx, key, field, val) {
             target.manualOverrides[field] = true;
         }
         saveStateToStorage();
+        refreshAppUI();
         return;
     }
 
     target[field] = val;
     saveStateToStorage();
 
-           // 전반기(firstHalf_)나 전체 시즌(fullSeason_) 성적이 바뀌면 후반기 자동 계산이 즉시 반영되도록 화면 갱신
-           target[field] = val;
-           saveStateToStorage();
-           if (key.startsWith('firstHalf_') || key.startsWith('fullSeason_')) {
-               refreshAppUI();
-           }
-       }
+    if (key.startsWith('firstHalf_') || key.startsWith('fullSeason_')) {
+        refreshAppUI();
+    }
+}
         
        function getSeasonCommentKey(rangeType) {
     if (rangeType === 'firstHalf') return 'firstHalfComments';
