@@ -2356,26 +2356,35 @@
                             merged[field] = userStats[field];
                         }
                     });
-
+ 
                     merged.manualOverrides = overrides;
                     userStats = merged;
                 }
+
+              const statFields = ['era', 'ip', 'k', 'win', 'loss', 'hold', 'save', 'whip', 'k9', 'qs', 'war'];
+                const statInputsHtml = statFields.map((field) => {
+                    const widthClass = ['k', 'win', 'loss', 'hold', 'save', 'qs'].includes(field) ? 'w-10' : 'w-12';
+                    const rawVal = userStats[field];
+                    const displayVal = (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') ? '' : String(rawVal);
+                    return `
+                        <td class="p-2.5 text-center">
+                            <input
+                                type="text"
+                                data-stat-input="true"
+                                value="${displayVal}"
+                                onkeydown="handleStatTabKey(event, this, ${sIdx}, '${statKey}', '${field}')"
+                                onchange="updatePlayerStat(${sIdx}, '${statKey}', '${field}', this.value)"
+                                class="${widthClass} border rounded px-1 text-center bg-transparent"
+                            >
+                        </td>
+                    `;
+                }).join('');
 
                 html += `
                     <tr>
                         <td class="p-2.5 font-bold">${p.name}<br><span class="text-[9px] text-slate-400">${p.position} (${p.hand})</span></td>
                         <td class="p-2.5 whitespace-nowrap"><span class="text-blue-600 font-semibold">메이저: ${stats.majorDays}일</span><br><span class="text-amber-600 font-semibold">마이너: ${stats.minorDays}일</span><br><span class="text-rose-600 font-semibold">부상: ${stats.injuryDays}일</span></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.era || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'era', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.ip || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'ip', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.k || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'k', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.win || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'win', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.loss || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'loss', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.hold || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'hold', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.save || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'save', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.whip || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'whip', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.k9 || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'k9', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.qs || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'qs', this.value)" class="w-10 border rounded px-1 text-center bg-transparent"></td>
-                        <td class="p-2.5 text-center"><input type="text" value="${userStats.war || ''}" onchange="updatePlayerStat(${sIdx}, '${statKey}', 'war', this.value)" class="w-12 border rounded px-1 text-center bg-transparent"></td>
+                        ${statInputsHtml}
                         <td class="p-2.5">
                             <input type="text" value="${commentData.title || ''}" onchange="updateCommentTitle(${sIdx}, '${rangeType}', '${p.name}', this.value)" placeholder="제목" class="w-32 border rounded px-2 py-1 mb-1 font-bold bg-transparent">
                             <br><button onclick="openMemoModal(${sIdx}, 'seasonEval', '${rangeType}', '${p.name}')" class="text-[11px] text-brand-600 underline font-semibold">전체 평가 보기</button>
@@ -3647,32 +3656,31 @@
             saveStateToStorage();
         }
 
-       function updatePlayerStat(sIdx, key, field, val) {
-           if (!seasons[sIdx].seasonEval.playerData[key]) {
-               seasons[sIdx].seasonEval.playerData[key] = {};
-           }
+function updatePlayerStat(sIdx, key, field, val) {
+    if (!seasons[sIdx].seasonEval.playerData[key]) {
+        seasons[sIdx].seasonEval.playerData[key] = {};
+    }
 
-           const target = seasons[sIdx].seasonEval.playerData[key];
+    const target = seasons[sIdx].seasonEval.playerData[key];
 
-           // 후반기 선수 성적(secondHalf_선수명)을 직접 입력할 때 수동 덮어쓰기 기록
-           if (key.startsWith('secondHalf_')) {
-               if (!target.manualOverrides) {
-                   target.manualOverrides = {};
-               }
+    if (key.startsWith('secondHalf_')) {
+        if (!target.manualOverrides) {
+            target.manualOverrides = {};
+        }
         const trimmed = String(val).trim();
-                      if (trimmed === '') {
-            // 입력값을 지우면 수동 덮어쓰기 해제 -> 다시 자동 계산값 표시
-                   delete target[field];
-                   delete target.manualOverrides[field];
-               } else {
-            // 숫자를 입력하면 해당 칸만 수동 값으로 고정
-                   target[field] = val;
-                   target.manualOverrides[field] = true;
-               }
-               saveStateToStorage();
-               refreshAppUI();
-               return;
-           }
+        if (trimmed === '') {
+            delete target[field];
+            delete target.manualOverrides[field];
+        } else {
+            target[field] = val;
+            target.manualOverrides[field] = true;
+        }
+        saveStateToStorage();
+        return;
+    }
+
+    target[field] = val;
+    saveStateToStorage();
 
            // 전반기(firstHalf_)나 전체 시즌(fullSeason_) 성적이 바뀌면 후반기 자동 계산이 즉시 반영되도록 화면 갱신
            target[field] = val;
@@ -3686,6 +3694,71 @@
     if (rangeType === 'firstHalf') return 'firstHalfComments';
     if (rangeType === 'secondHalf') return 'secondHalfComments';
     return 'fullSeasonComments';
+}
+
+function handleStatTabKey(event, inputEl, sIdx, key, field) {
+    if (event.key !== 'Tab') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const val = inputEl.value;
+    if (seasons?.[sIdx]?.seasonEval?.playerData) {
+        if (!seasons[sIdx].seasonEval.playerData[key]) {
+            seasons[sIdx].seasonEval.playerData[key] = {};
+        }
+        const target = seasons[sIdx].seasonEval.playerData[key];
+
+        if (String(key).startsWith('secondHalf_')) {
+            if (!target.manualOverrides) target.manualOverrides = {};
+            const trimmed = String(val).trim();
+            if (trimmed === '') {
+                delete target[field];
+                delete target.manualOverrides[field];
+            } else {
+                target[field] = val;
+                target.manualOverrides[field] = true;
+            }
+        } else {
+            target[field] = val;
+        }
+    }
+
+    const getVisibleStatInputs = () =>
+        Array.from(document.querySelectorAll('input[data-stat-input="true"]'))
+            .filter((el) => el.offsetParent !== null);
+
+    const inputsBefore = getVisibleStatInputs();
+    const curIndex = inputsBefore.indexOf(inputEl);
+    const targetIndex = curIndex !== -1 ? (event.shiftKey ? curIndex - 1 : curIndex + 1) : -1;
+
+    if (typeof saveStateToStorage === 'function') {
+        saveStateToStorage();
+    }
+
+    if (targetIndex >= 0) {
+        const focusTarget = () => {
+            const inputsNow = getVisibleStatInputs();
+            const nextEl = inputsNow[targetIndex] || inputsBefore[targetIndex];
+            if (nextEl && document.contains(nextEl)) {
+                const prevX = window.scrollX;
+                const prevY = window.scrollY;
+                try {
+                    nextEl.focus({ preventScroll: true });
+                } catch (_) {
+                    nextEl.focus();
+                }
+                if (typeof nextEl.select === 'function') {
+                    nextEl.select();
+                }
+                window.scrollTo(prevX, prevY);
+            }
+        };
+        requestAnimationFrame(() => {
+            focusTarget();
+            setTimeout(focusTarget, 30);
+        });
+    }
 }
 
 function updateCommentTitle(sIdx, rangeType, playerName, val) {
@@ -3879,18 +3952,23 @@ function calculateSecondHalfStats(season, playerName) {
     const fullStat = season.seasonEval.playerData?.[`fullSeason_${playerName}`] || {};
     const firstStat = season.seasonEval.playerData?.[`firstHalf_${playerName}`] || {};
 
-    // 이닝 계산 (아웃카운트 기준)
+    const hasFullIp = fullStat.ip !== undefined && fullStat.ip !== null && String(fullStat.ip).trim() !== '';
+    const hasFirstIp = firstStat.ip !== undefined && firstStat.ip !== null && String(firstStat.ip).trim() !== '';
+
     const fullOuts = ipToOuts(fullStat.ip);
     const firstOuts = ipToOuts(firstStat.ip);
     const secondOuts = Math.max(0, fullOuts - firstOuts);
     const secondRealIp = secondOuts / 3;
 
-    // 누적 카운트 차감 (승, 패, 홀드, 세이브, 탈삼진, QS, K 등)
+    const hasVal = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+
+    // 누적 카운트 차감 (승, 패, 홀드, 세이브, 탈삼진, QS) — 0도 그대로 반환
     const diffInt = (f) => {
+        if (!hasVal(fullStat[f]) && !hasVal(firstStat[f])) return '';
         const fVal = parseInt(fullStat[f], 10) || 0;
         const iVal = parseInt(firstStat[f], 10) || 0;
         const diff = fVal - iVal;
-        return diff >= 0 ? diff : '';
+        return diff >= 0 ? diff : 0;
     };
 
     const win = diffInt('win');
@@ -3900,28 +3978,33 @@ function calculateSecondHalfStats(season, playerName) {
     const k = diffInt('k');
     const qs = diffInt('qs');
 
+    // WAR — 0이나 0.0도 그대로 표시
     let war = '';
-    if (fullStat.war !== undefined && fullStat.war !== null && String(fullStat.war).trim() !== '') {
+    if (hasVal(fullStat.war) || hasVal(firstStat.war)) {
         const fullWarNum = parseFloat(fullStat.war) || 0;
         const firstWarNum = parseFloat(firstStat.war) || 0;
         war = (fullWarNum - firstWarNum).toFixed(2);
     }
 
-    // ERA 및 WHIP 역산 계산
+    // IP — 전반기/전체 이닝이 입력된 경우 0.0이라도 표시
+    let ipStr = '';
+    if (hasFullIp || hasFirstIp) {
+        ipStr = outsToIpStr(secondOuts);
+    }
+
+    // ERA, WHIP, K/9
     let eraStr = '';
     let whipStr = '';
     let k9Str = '';
 
     if (secondOuts > 0) {
-        // 자책점 역산: (전체 ERA * 전체 이닝) - (전반기 ERA * 전반기 이닝)
-        if (fullStat.era && firstStat.era) {
+        if (hasVal(fullStat.era) && hasVal(firstStat.era)) {
             const fullEr = (parseFloat(fullStat.era) * (fullOuts / 3)) / 9;
             const firstEr = (parseFloat(firstStat.era) * (firstOuts / 3)) / 9;
             const secondEr = Math.max(0, fullEr - firstEr);
             eraStr = ((secondEr * 9) / secondRealIp).toFixed(2);
         }
-        // WHIP 역산: (전체 WHIP * 전체 이닝) - (전반기 WHIP * 전반기 이닝)
-        if (fullStat.whip && firstStat.whip) {
+        if (hasVal(fullStat.whip) && hasVal(firstStat.whip)) {
             const fullHb = parseFloat(fullStat.whip) * (fullOuts / 3);
             const firstHb = parseFloat(firstStat.whip) * (firstOuts / 3);
             const secondHb = Math.max(0, fullHb - firstHb);
@@ -3930,20 +4013,24 @@ function calculateSecondHalfStats(season, playerName) {
         if (k !== '') {
             k9Str = ((k * 9) / secondRealIp).toFixed(2);
         }
+    } else if (hasFullIp || hasFirstIp) {
+        if (hasVal(fullStat.era) || hasVal(firstStat.era)) eraStr = '0.00';
+        if (hasVal(fullStat.whip) || hasVal(firstStat.whip)) whipStr = '0.00';
+        if (k !== '') k9Str = '0.00';
     }
 
     return {
         era: eraStr,
-        ip: secondOuts > 0 ? outsToIpStr(secondOuts) : '',
-        k: k !== '' ? k : '',
-        win: win !== '' ? win : '',
-        loss: loss !== '' ? loss : '',
-        hold: hold !== '' ? hold : '',
-        save: save !== '' ? save : '',
+        ip: ipStr,
+        k: k,
+        win: win,
+        loss: loss,
+        hold: hold,
+        save: save,
         whip: whipStr,
         k9: k9Str,
-        qs: qs !== '' ? qs : '',
-        war: war !== '0.0' ? war : ''
+        qs: qs,
+        war: war
     };
 }
 
@@ -4028,6 +4115,9 @@ function computeAndRenderSecondHalfTeamStats(s, sIdx) {
         if (oEl) oEl.textContent = shOpsStr;
     }, 50);
 }
+
+window.handleStatTabKey = handleStatTabKey;
+
     </script>
 </body>
 </html>
