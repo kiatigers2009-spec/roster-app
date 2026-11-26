@@ -5280,15 +5280,20 @@ function seedLegacyRecordsFromExcel() {
 
     let changed = false;
     Object.entries(legacySeed).forEach(([name, payload]) => {
-        if (!recordsArchive.legacyRecords[name]) {
-            recordsArchive.legacyRecords[name] = {
-                reg: payload.reg || {},
-                ds: payload.ds || {},
-                cs: payload.cs || {}
-            };
-            changed = true;
+    if (!recordsArchive.legacyRecords[name]) {
+        recordsArchive.legacyRecords[name] = { reg: {}, ds: {}, cs: {} };
+    }
+    const target = recordsArchive.legacyRecords[name];
+    ['reg', 'ds', 'cs'].forEach((sec) => {
+        const seedSec = payload[sec] || {};
+        if (!target[sec] || Object.keys(target[sec]).length === 0) {
+            if (Object.keys(seedSec).length > 0) {
+                target[sec] = { ...seedSec };
+                changed = true;
+            }
         }
     });
+});
 
     if (changed && typeof saveStateToStorage === 'function') {
         saveStateToStorage();
